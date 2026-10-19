@@ -1,0 +1,21 @@
+CREATE TABLE notification_deliveries (
+  id BINARY(16) PRIMARY KEY,
+  notification_id BINARY(16) NULL,
+  team_id BINARY(16) NULL,
+  recipient_user_id BINARY(16) NOT NULL,
+  notification_type VARCHAR(80) NOT NULL,
+  channel ENUM('in_app') NOT NULL DEFAULT 'in_app',
+  status ENUM('queued','delivered','suppressed','failed') NOT NULL,
+  idempotency_key BINARY(32) NOT NULL,
+  attempts INT UNSIGNED NOT NULL DEFAULT 0,
+  next_retry_at DATETIME(3) NULL,
+  delivered_at DATETIME(3) NULL,
+  last_error VARCHAR(120) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY uq_notification_delivery_idempotency (idempotency_key),
+  KEY idx_notification_delivery_recipient_date (recipient_user_id,created_at),
+  KEY idx_notification_delivery_status_retry (status,next_retry_at),
+  CONSTRAINT fk_notification_delivery_notification FOREIGN KEY (notification_id) REFERENCES notifications(id),
+  CONSTRAINT fk_notification_delivery_team FOREIGN KEY (team_id) REFERENCES teams(id),
+  CONSTRAINT fk_notification_delivery_recipient FOREIGN KEY (recipient_user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

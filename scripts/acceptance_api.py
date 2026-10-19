@@ -1,0 +1,292 @@
+"""API integration smoke test against an already migrated local TeamMind database.
+Creates uniquely named test accounts and teams. Run: python3 scripts/acceptance_api.py
+"""
+import json
+import os
+import secrets
+import urllib.error
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
+
+BASE = os.environ.get('TEAMMIND_API_BASE', 'http://127.0.0.1:8188/api/v1').rstrip('/')
+
+def call(path, method='GET', data=None, token=None):
+    headers = {'Content-Type': 'application/json'}
+    if token: headers['Authorization'] = 'Bearer ' + token
+    req = urllib.request.Request(BASE + path, data=None if data is None else json.dumps(data).encode(), headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=20) as response: return response.status, json.load(response)['data']
+    except urllib.error.HTTPError as error: return error.code, json.load(error)
+
+def stream(path, data, token):
+    request = urllib.request.Request(
+        BASE + path,
+        data=json.dumps(data).encode(),
+        headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            body = response.read().decode()
+    except urllib.error.HTTPError as error:
+        return error.code, error.read().decode()
+    events = []
+    for frame in body.replace('\r\n', '\n').split('\n\n'):
+        lines = frame.splitlines()
+        event = next((line[6:].strip() for line in lines if line.startswith('event:')), '')
+        data = next((line[5:].strip() for line in lines if line.startswith('data:')), '')
+        if event and data:
+            events.append({'event': event, 'data': json.loads(data)})
+    return response.status, events
+
+def need(actual, expected, label):
+    assert actual == expected, f'{label}: expected {expected}, got {actual}'
+    print('PASS', label)
+
+suffix = secrets.token_hex(4)
+password = 'test-password-' + suffix
+
+def account(kind):
+    email = f'{kind}-{suffix}@teammind.test'
+    status, _ = call('/auth/register', 'POST', {'email': email, 'name': kind.title(), 'password': password})
+    need(status, 201, f'{kind} registration')
+    status, result = call('/auth/login', 'POST', {'email': email, 'password': password, 'remember': False})
+    need(status, 200, f'{kind} login')
+    return email, result['accessToken']
+
+owner_email, owner = account('owner')
+_, member = account('member')
+_, outsider = account('outsider')
+status, team = call('/teams', 'POST', {'name': 'Acceptance ' + suffix, 'description': 'Test', 'timezone': 'Asia/Shanghai'}, owner)
+need(status, 201, 'create team')
+tid = team['id']
+team_audit = call(f'/teams/{tid}/audit-log', token=owner)[1]
+need(any(row['action'] == 'team.create' for row in team_audit), True, 'team owner can read persisted team audit')
+need(call(f'/teams/{tid}/audit-log', token=outsider)[0], 403, 'nonmember cannot read team audit')
+need(call('/platform/teams', token=owner)[0], 403, 'ordinary team owner cannot access platform review')
+status, channel = call('/me/channels/wechat', token=owner)
+need(status, 200, 'read channel configuration')
+if channel['mode'] == 'mock':
+    status, qr = call('/me/channels/wechat/sessions', 'POST', {'teamId': tid}, owner)
+    need(status, 201, 'mock QR session clearly marked')
+    need(qr['simulated'], True, 'mock QR cannot masquerade as real')
+    need(call(f'/me/channels/wechat/sessions/{qr["id"]}/mock-confirm', 'POST', {}, owner)[0], 200, 'mock confirmation')
+    need(len(call('/me/channels/wechat', token=owner)[1]['bindings']), 0, 'mock cannot create real channel binding')
+need(call(f'/teams/{tid}/projects', token=outsider)[0], 403, 'cross-team project read denied')
+status, invite = call(f'/teams/{tid}/invitations', 'POST', {'expiresInHours': 1, 'maxUses': 1}, owner)
+need(status, 201, 'create invitation')
+with ThreadPoolExecutor(max_workers=2) as pool:
+    attempts = list(pool.map(lambda token: call('/invitations/accept', 'POST', {'token': invite['token']}, token)[0], [member, outsider]))
+need(sorted(attempts), [200, 410], 'concurrent invitation has one use')
+joined = member if attempts[0] == 200 else outsider
+other = outsider if attempts[0] == 200 else member
+need(call(f'/teams/{tid}/audit-log', token=joined)[0], 403, 'ordinary member cannot read team audit')
+need(call(f'/teams/{tid}/projects', token=other)[0], 403, 'unused account denied')
+need(call(f'/teams/{tid}/invitations', 'POST', {'expiresInHours': 1, 'maxUses': 1}, joined)[0], 403, 'member cannot invite')
+status, project = call(f'/teams/{tid}/projects', 'POST', {'name': 'Plan Test', 'description': '', 'status': 'active', 'startDate': '2026-10-17', 'dueDate': '2026-11-17'}, owner)
+need(status, 201, 'create project')
+need(call(f'/teams/{tid}/projects/{project["id"]}', 'PATCH', {'name': 'Plan Test edited', 'description': 'project schedule updated', 'status': 'active', 'startDate': '2026-10-18', 'dueDate': '2026-11-20'}, joined)[0], 403, 'ordinary member cannot edit project')
+need(call(f'/teams/{tid}/projects', 'POST', {'name': 'Unauthorized project', 'status': 'planning'}, joined)[0], 403, 'ordinary member cannot create project')
+need(call(f'/teams/{tid}/projects/{project["id"]}', 'PATCH', {'name': 'Plan Test edited', 'description': 'project schedule updated', 'status': 'active', 'startDate': '2026-10-18', 'dueDate': '2026-11-20'}, owner)[0], 200, 'owner edits project schedule')
+need(call(f'/teams/{tid}/projects/{project["id"]}', 'PATCH', {'name': 'Plan Test edited', 'description': 'project schedule updated', 'status': 'active', 'startDate': '2026-10-18', 'dueDate': '2026-11-20'}, owner)[0], 200, 'unchanged project update is idempotently successful')
+_, project_page = call(f'/teams/{tid}/projects?q=Plan%20Test%20edited&status=active', token=owner)
+need(project_page['items'][0]['startDate'], '2026-10-18', 'project start date persists through filtered read')
+need(project_page['items'][0]['dueDate'], '2026-11-20', 'project due date persists through filtered read')
+need(call(f'/teams/{tid}/projects?q=Plan%20Test%20edited&status=planning', token=owner)[1]['total'], 0, 'project status filter matches server data')
+need(call(f'/teams/{tid}/projects?q=Plan%20Test%20edited&status=unknown', token=owner)[0], 400, 'invalid project filter rejected')
+need(call(f'/teams/{tid}/projects/{project["id"]}', 'PATCH', {'name': 'Invalid range', 'description': '', 'status': 'active', 'startDate': '2026-11-21', 'dueDate': '2026-11-20'}, owner)[0], 400, 'project end before start rejected')
+need(call(f'/teams/{tid}/projects/{project["id"]}', 'DELETE', token=joined)[0], 403, 'ordinary member cannot delete project')
+status, empty_project = call(f'/teams/{tid}/projects', 'POST', {'name': 'Empty project', 'description': '', 'status': 'planning'}, owner)
+need(status, 201, 'create empty project for deletion test')
+need(call(f'/teams/{tid}/projects/{empty_project["id"]}', 'DELETE', token=owner)[0], 200, 'owner deletes empty project')
+need(call(f'/teams/{tid}/projects/{empty_project["id"]}', token=owner)[0], 404, 'soft-deleted project is not readable')
+_, owner_info = call('/me', token=owner)
+need(call(f'/teams/{tid}/tasks', 'POST', {'projectId': project['id'], 'title': 'Unauthorized assignment', 'assigneeId': owner_info['id']}, joined)[0], 403, 'ordinary member cannot assign a new task to another member')
+status, team_memory = call(f'/teams/{tid}/memories', 'POST', {'category': 'policy', 'content': 'Persisted team policy'}, owner)
+need(status, 201, 'administrator creates audited team knowledge')
+need(any(item['id'].lower() == team_memory['id'].lower() for item in call(f'/teams/{tid}/memories', token=joined)[1]), True, 'team knowledge is readable to members')
+need(call(f'/teams/{tid}/memories', 'POST', {'category': 'policy', 'content': ' Persisted team policy '}, owner)[0], 409, 'duplicate team knowledge is rejected')
+need(call(f'/teams/{tid}/memories/{team_memory["id"]}', 'PATCH', {'category': 'policy', 'content': 'member write denied', 'confirmed': True}, joined)[0], 403, 'ordinary member cannot edit team knowledge')
+need(call(f'/teams/{tid}/memories/{team_memory["id"]}', 'PATCH', {'category': 'policy', 'content': 'Updated team policy', 'confirmed': True, 'reviewAt': '2026-11-17', 'expiresAt': '2027-11-17'}, owner)[0], 200, 'administrator updates, confirms and schedules team knowledge')
+team_memory_rows = call(f'/teams/{tid}/memories', token=joined)[1]
+updated_team_memory = next(memory for memory in team_memory_rows if memory['id'].lower() == team_memory['id'].lower())
+need(updated_team_memory['reviewAt'][:10], '2026-11-17', 'team memory review date persists')
+need(updated_team_memory['expiresAt'][:10], '2027-11-17', 'team memory expiration persists')
+need(call(f'/teams/{tid}/memories/{team_memory["id"]}', 'DELETE', token=owner)[0], 200, 'administrator removes team knowledge')
+status, task = call(f'/teams/{tid}/tasks', 'POST', {'projectId': project['id'], 'title': 'Approval Test', 'description': '', 'assigneeId': owner_info['id'], 'priority': 'high', 'startDate': '2026-10-20', 'dueDate': '2026-10-28', 'milestone': True}, owner)
+need(status, 201, 'create task')
+status, tool_result = call('/me/agent/tools/execute', 'POST', {'tool': 'list_team_tasks', 'teamId': tid, 'confirmTeam': True, 'limit': 10}, owner)
+need(status, 200, 'allowlisted read-only agent tool checks active team membership')
+need(any(item['id'].lower() == task['id'].lower() for item in tool_result['items']), True, 'agent tool returns real tasks from the confirmed team')
+need(call('/me/agent/tools/execute', 'POST', {'tool': 'run_shell', 'teamId': tid, 'confirmTeam': True}, owner)[0], 403, 'agent tool dispatcher rejects tools outside server allowlist')
+need(call('/me/agent/tools/execute', 'POST', {'tool': 'list_team_tasks', 'teamId': tid, 'confirmTeam': True}, other)[0], 403, 'agent read-only tool rejects a nonmember requesting copied team id')
+tool_audit = call(f'/teams/{tid}/audit-log', token=owner)[1]
+need(any(row['action'] == 'agent.tool.execute' for row in tool_audit), True, 'successful agent tool execution is audited')
+need(any(row['action'] == 'agent.tool.denied' for row in tool_audit), True, 'denied agent tool execution is audited')
+need(call(f'/teams/{tid}/projects/{project["id"]}', 'DELETE', token=owner)[0], 409, 'project with tasks cannot be deleted')
+status, second_task = call(f'/teams/{tid}/tasks', 'POST', {'projectId': project['id'], 'title': 'Dependency Test', 'description': '', 'assigneeId': owner_info['id'], 'priority': 'medium', 'startDate': '2026-10-20', 'dueDate': '2026-10-29', 'milestone': False}, owner)
+need(status, 201, 'create second task')
+need(call(f'/teams/{tid}/tasks/{task["id"]}/dependencies', 'POST', {'dependsOnTaskId': second_task['id']}, owner)[0], 201, 'add dependency')
+need(call(f'/teams/{tid}/tasks/{second_task["id"]}/dependencies', 'POST', {'dependsOnTaskId': task['id']}, owner)[0], 409, 'dependency cycle rejected')
+need(call(f'/teams/{tid}/tasks/{task["id"]}/dependencies', 'POST', {'dependsOnTaskId': second_task['id']}, joined)[0], 403, 'unrelated member cannot alter dependency')
+need(call(f'/teams/{tid}/tasks/{task["id"]}/dependencies', 'DELETE', {'dependsOnTaskId': second_task['id']}, owner)[0], 200, 'remove task dependency')
+need(len(call(f'/teams/{tid}/tasks/{task["id"]}/dependencies', token=owner)[1]), 0, 'removed task dependency no longer appears')
+_, member_info_for_collaboration = call('/me', token=joined)
+need(call(f'/teams/{tid}/tasks/{task["id"]}/collaborators', 'POST', {'userId': member_info_for_collaboration['id']}, owner)[0], 201, 'add task collaborator')
+collaborators = call(f'/teams/{tid}/tasks/{task["id"]}/collaborators', token=owner)[1]
+need(any(c['id'].lower() == member_info_for_collaboration['id'].lower() and c['status'] == 'active' for c in collaborators), True, 'task collaborator is persisted and scoped')
+need(call(f'/teams/{tid}/tasks/{task["id"]}/collaborators/{member_info_for_collaboration["id"]}', 'DELETE', token=owner)[0], 200, 'task creator or assignee can remove collaborator')
+need(len(call(f'/teams/{tid}/tasks/{task["id"]}/collaborators', token=owner)[1]), 0, 'removed task collaborator no longer appears')
+need(call(f'/teams/{tid}/tasks/{task["id"]}/collaborators', 'POST', {'userId': member_info_for_collaboration['id']}, owner)[0], 201, 're-add task collaborator')
+need(call(f'/teams/{tid}/tasks/{task["id"]}', 'PATCH', {'status': 'doing', 'progress': 10, 'version': 1}, joined)[0], 200, 'active task collaborator can update task progress')
+joined_info_for_plan = member_info_for_collaboration
+status, proposal = call(f'/teams/{tid}/plan-proposals', 'POST', {'taskId': task['id'], 'title': 'Approval Test after review', 'description': 'Approved description', 'assigneeId': joined_info_for_plan['id'], 'priority': 'urgent', 'milestone': False, 'startDate': '2026-10-20', 'dueDate': '2026-11-05', 'reason': 'Integration test', 'impactSummary': 'Later delivery'}, owner)
+need(status, 201, 'submit proposal')
+_, before = call(f'/teams/{tid}/tasks/{task["id"]}', token=owner)
+need(before['dueDate'], '2026-10-28', 'plan unchanged before approval')
+need(before['title'], 'Approval Test', 'title unchanged before approval')
+need(before['priority'], 'high', 'priority unchanged before approval')
+need(call(f'/teams/{tid}/plan-proposals/{proposal["id"]}/decision', 'POST', {'decision': 'approved', 'reason': '', 'startDate': '', 'dueDate': ''}, joined)[0], 403, 'member cannot approve')
+need(call(f'/teams/{tid}/plan-proposals/{proposal["id"]}/decision', 'POST', {'decision': 'edited_approved', 'reason': '', 'title': 'Reviewer edited title', 'priority': 'medium'}, owner)[0], 200, 'owner edits and approves')
+_, after = call(f'/teams/{tid}/tasks/{task["id"]}', token=owner)
+need(after['dueDate'], '2026-11-05', 'plan changed after approval')
+need(after['title'], 'Reviewer edited title', 'edited approved title updated')
+need(after['description'], 'Approved description', 'approved description updated')
+need(after['priority'], 'medium', 'edited approval priority updated')
+need(after['assigneeId'], joined_info_for_plan['id'].upper(), 'approved assignee updated to active team member')
+need(after['milestone'], False, 'approved milestone updated')
+status, comment_record = call(f'/teams/{tid}/tasks/{task["id"]}/comments', 'POST', {'body': 'Initial audited comment'}, owner)
+need(status, 201, 'create audited task comment')
+comment_id = comment_record['id']
+need(call(f'/teams/{tid}/tasks/{task["id"]}/comments/{comment_id}', 'PATCH', {'body': 'Unauthorized edit'}, joined)[0], 403, 'other team member cannot edit copied comment id')
+need(call(f'/teams/{tid}/tasks/{task["id"]}/comments/{comment_id}', 'PATCH', {'body': 'Edited audited comment'}, owner)[0], 200, 'comment author can edit')
+need(any(c['id'].lower() == comment_id.lower() and c['body'] == 'Edited audited comment' for c in call(f'/teams/{tid}/tasks/{task["id"]}/comments', token=owner)[1]), True, 'edited comment persists')
+need(call(f'/teams/{tid}/tasks/{task["id"]}/comments/{comment_id}', 'DELETE', token=owner)[0], 200, 'comment author can delete')
+need(any(c['id'].lower() == comment_id.lower() for c in call(f'/teams/{tid}/tasks/{task["id"]}/comments', token=owner)[1]), False, 'deleted comment is no longer listed')
+status, filtered_tasks = call(f'/teams/{tid}/tasks?assigneeId={joined_info_for_plan["id"]}&dateFrom=2026-10-19&dateTo=2026-10-25&sortBy=priority&sortDir=ASC&page=1&pageSize=10', token=owner)
+need(status, 200, 'task filters and allowlisted sort accepted')
+need(any(row['id'].lower() == task['id'].lower() for row in filtered_tasks['items']), True, 'assignee and date filters return approved task')
+need(call(f'/teams/{tid}/tasks?sortBy=created_at', token=owner)[0], 400, 'task sort SQL field injection rejected')
+need(call(f'/teams/{tid}/plan-proposals/{proposal["id"]}/decision', 'POST', {'decision': 'approved', 'reason': '', 'startDate': '', 'dueDate': ''}, owner)[0], 409, 'duplicate approval rejected')
+need(call(f'/teams/{tid}/tasks/{task["id"]}', 'PATCH', {'status': 'doing', 'progress': 20, 'version': 1}, owner)[0], 409, 'stale task version rejected')
+status, supplement = call(f'/teams/{tid}/plan-proposals', 'POST', {'taskId': second_task['id'], 'startDate': '2026-10-21', 'dueDate': '2026-11-02', 'reason': 'Need schedule change', 'impactSummary': 'Reviewer should ask for more detail'}, owner)
+need(status, 201, 'submit proposal requiring clarification')
+need(call(f'/teams/{tid}/plan-proposals/{supplement["id"]}/decision', 'POST', {'decision': 'needs_info', 'reason': 'Explain impact', 'startDate': '', 'dueDate': ''}, owner)[0], 200, 'reviewer asks for clarification')
+_, unchanged = call(f'/teams/{tid}/tasks/{second_task["id"]}', token=owner)
+need(unchanged['dueDate'], '2026-10-29', 'clarification leaves official plan unchanged')
+detail = {'title': 'Dependency Test clarified', 'description': 'Clarified plan detail', 'priority': 'high', 'assigneeId': '', 'milestone': True, 'startDate': '2026-10-21', 'dueDate': '2026-11-02', 'reason': 'Clarification added for reviewer', 'impactSummary': 'Dependency is delayed'}
+need(call(f'/teams/{tid}/plan-proposals/{supplement["id"]}/resubmit', 'POST', detail, joined)[0], 403, 'other member cannot resubmit proposal')
+need(call(f'/teams/{tid}/plan-proposals/{supplement["id"]}/resubmit', 'POST', detail, owner)[0], 200, 'author resubmits clarification')
+need(call(f'/teams/{tid}/plan-proposals/{supplement["id"]}/resubmit', 'POST', detail, owner)[0], 409, 'duplicate resubmission rejected')
+need(call(f'/teams/{tid}/plan-proposals/{supplement["id"]}/decision', 'POST', {'decision': 'approved', 'reason': '', 'startDate': '', 'dueDate': ''}, owner)[0], 200, 'resubmitted proposal approved with history')
+_, clarified = call(f'/teams/{tid}/tasks/{second_task["id"]}', token=owner)
+need(clarified['dueDate'], '2026-11-02', 'resubmitted official plan updated')
+need(clarified['title'], 'Dependency Test clarified', 'resubmitted title applied')
+need(clarified['description'], 'Clarified plan detail', 'resubmitted description applied')
+need(clarified['priority'], 'high', 'resubmitted priority applied')
+need(clarified['assigneeId'], None, 'resubmitted task unassigned')
+need(clarified['milestone'], True, 'resubmitted milestone applied')
+status, personal_memory = call('/me/memories', 'POST', {'category': 'profile', 'content': 'Private acceptance fact'}, owner)
+need(status, 201, 'create personal memory')
+need(len(call('/me/memories', token=joined)[1]), 0, 'other user cannot read personal memory')
+need(call(f'/me/memories/{personal_memory["id"]}', 'PATCH', {'category': 'profile', 'content': 'Tamper attempt', 'confirmed': True}, joined)[0], 404, 'other user cannot modify personal memory by copied id')
+_, ai_status = call('/me/ai/status', token=owner)
+need(ai_status['simulated'], True, 'mock AI status explicitly declared')
+status, conversation = call('/me/conversations', 'POST', {'teamId': '', 'confirmTeam': False}, owner)
+need(status, 201, 'create private conversation')
+status, reply_stream = stream(f'/me/conversations/{conversation["id"]}/stream', {'content': 'Private AI test', 'confirmTeam': False}, owner)
+need(status, 200, 'stream mock conversation reply')
+need(any(event['event'] == 'delta' for event in reply_stream) and any(event['event'] == 'done' for event in reply_stream), True, 'stream emits reply chunks and completion')
+need(''.join(event['data'].get('content', '') for event in reply_stream if event['event'] == 'delta'), '[本地模拟模式] 已收到你的消息：Private AI test', 'mock reply explicitly declared')
+need(len(call(f'/me/conversations/{conversation["id"]}/messages', token=owner)[1]), 2, 'conversation messages survive a new request')
+extract_status, extract_result = call(f'/me/conversations/{conversation["id"]}/extract-memory-candidates', 'POST', {'confirmTeam': False}, owner)
+need(extract_status, 503, 'mock mode refuses to pretend automated extraction works')
+need(extract_result['code'], 'AI_SIMULATED', 'mock extraction failure is explicit')
+need(call(f'/me/conversations/{conversation["id"]}/messages', token=joined)[0], 404, 'other user cannot read copied conversation id')
+conversation_messages = call(f'/me/conversations/{conversation["id"]}/messages', token=owner)[1]
+source_message = next(message for message in conversation_messages if message['role'] == 'assistant')
+candidate_status, candidate = call(f'/me/conversations/{conversation["id"]}/messages/{source_message["id"]}/memory-candidate', 'POST', {'category': 'operational_knowledge'}, owner)
+need(candidate_status, 201, 'save assistant response as unconfirmed personal memory candidate')
+memory_rows = call('/me/memories', token=owner)[1]
+candidate_row = next(memory for memory in memory_rows if memory['id'].lower() == candidate['id'].lower())
+need(candidate_row['confirmed'], False, 'memory candidate requires explicit confirmation')
+need(candidate_row['sourceMessageId'].lower(), source_message['id'].lower(), 'memory candidate retains source message ID')
+need(candidate_row['sourceExcerpt'], source_message['content'][:240], 'memory candidate exposes source excerpt for review')
+need(call(f'/me/conversations/{conversation["id"]}/messages/{source_message["id"]}/memory-candidate', 'POST', {'category': 'operational_knowledge'}, owner)[0], 409, 'duplicate memory candidate is rejected')
+need(call(f'/me/memories/{candidate["id"]}', 'PATCH', {'category': 'operational_knowledge', 'content': 'Reviewed private fact', 'confirmed': True, 'reviewAt': '2026-11-17', 'expiresAt': '2027-11-17'}, owner)[0], 200, 'edit and confirm memory candidate with review schedule')
+reviewed = next(memory for memory in call('/me/memories', token=owner)[1] if memory['id'].lower() == candidate['id'].lower())
+need(reviewed['confirmed'], True, 'confirmed memory is visible as approved')
+need(reviewed['reviewAt'][:10], '2026-11-17', 'memory review date persists')
+need(reviewed['expiresAt'][:10], '2027-11-17', 'memory expiration date persists')
+need(call(f'/me/memories/{candidate["id"]}', 'PATCH', {'category': 'operational_knowledge', 'content': 'Reviewed private fact', 'confirmed': True, 'reviewAt': '2027-12-01', 'expiresAt': '2027-01-01'}, owner)[0], 400, 'memory review date cannot follow expiration date')
+_, joined_info = call('/me', token=joined)
+need(call(f'/teams/{tid}/members/{joined_info["id"]}', 'PATCH', {'role': 'team_admin', 'status': 'active'}, owner)[0], 200, 'owner promotes team administrator')
+status, notice_proposal = call(f'/teams/{tid}/plan-proposals', 'POST', {'taskId': second_task['id'], 'startDate': '2026-10-22', 'dueDate': '2026-11-06', 'reason': 'Notification delivery test', 'impactSummary': 'Inform reviewer'}, owner)
+need(status, 201, 'submit proposal that notifies another administrator')
+_, unread = call('/me/notifications/unread-count', token=joined)
+need(unread['count'] > 0, True, 'administrator unread badge derives from SQL')
+_, inbox = call('/me/notifications', token=joined)
+need(len(inbox) > 0, True, 'administrator sees persisted notification')
+_, delivery_rows = call('/me/notification-deliveries', token=joined)
+need(any(row['status'] == 'delivered' and row['channel'] == 'in_app' for row in delivery_rows), True, 'notification delivery status is persisted and visible')
+need(call(f'/me/notifications/{inbox[0]["id"]}', 'PATCH', {}, joined)[0], 200, 'administrator marks one notification read')
+need(call('/me/notifications/read-all', 'POST', {}, joined)[0], 200, 'administrator marks all notifications read')
+need(call('/me/notifications/unread-count', token=joined)[1]['count'], 0, 'unread count follows read operations')
+need(call('/me/notification-preferences', 'PATCH', {'enabled': True, 'quietStart': '22:00', 'quietEnd': ''}, joined)[0], 400, 'incomplete quiet hours rejected')
+need(call('/me/notification-preferences', 'PATCH', {'enabled': True, 'quietStart': '22:00', 'quietEnd': '08:00'}, joined)[0], 200, 'quiet hours persisted')
+need(call('/me/notification-preferences', token=joined)[1]['quietStart'], '22:00', 'quiet hours read after write')
+admin_invite_status, admin_invite = call(f'/teams/{tid}/invitations', 'POST', {'expiresInHours': 1, 'maxUses': 1}, joined)
+need(admin_invite_status, 201, 'administrator can invite')
+need(call(f'/teams/{tid}/members/{owner_info["id"]}', 'PATCH', {'role': 'member', 'status': 'active'}, joined)[0], 403, 'administrator cannot demote owner')
+status, team_conversation = call('/me/conversations', 'POST', {'teamId': tid, 'confirmTeam': True}, joined)
+need(status, 201, 'administrator creates team-context private conversation')
+need(stream(f'/me/conversations/{team_conversation["id"]}/stream', {'content': 'Team context must be confirmed', 'confirmTeam': False}, joined)[0], 400, 'team conversation refuses unconfirmed model context')
+team_stream_status, team_stream = stream(f'/me/conversations/{team_conversation["id"]}/stream', {'content': 'Use confirmed team context', 'confirmTeam': True}, joined)
+need(team_stream_status, 200, 'confirmed team conversation streams reply')
+need(any(event['event'] == 'done' for event in team_stream), True, 'team reply finishes before persistence')
+need(call(f'/me/conversations/{team_conversation["id"]}/extract-memory-candidates', 'POST', {'confirmTeam': False}, joined)[0], 400, 'team memory extraction requires explicit context confirmation')
+need(call(f'/me/conversations/{team_conversation["id"]}/extract-memory-candidates', 'POST', {'confirmTeam': True}, joined)[0], 503, 'team extraction still clearly reports local mock mode')
+need(call(f'/teams/{tid}/members/{joined_info["id"]}', 'PATCH', {'role': 'team_admin', 'status': 'suspended'}, owner)[0], 200, 'owner suspends administrator')
+need(call(f'/teams/{tid}/invitations/{admin_invite["id"]}', 'DELETE', token=joined)[0], 403, 'suspended administrator cannot revoke an invitation')
+need(call(f'/teams/{tid}/invitations', 'POST', {'expiresInHours': 1, 'maxUses': 1}, joined)[0], 403, 'suspended administrator cannot create an invitation')
+need(len(call('/me/conversations', token=joined)[1]), 0, 'suspended member cannot list team conversation metadata')
+need(call(f'/me/conversations/{team_conversation["id"]}/messages', token=joined)[0], 403, 'suspended member cannot read team conversation messages')
+need(call(f'/teams/{tid}/members/{joined_info["id"]}', 'PATCH', {'role': 'team_owner', 'status': 'active'}, owner)[0], 409, 'ownership cannot transfer to suspended member')
+need(call(f'/teams/{tid}/members/{joined_info["id"]}', 'PATCH', {'role': 'team_admin', 'status': 'active'}, owner)[0], 200, 'owner reactivates administrator')
+need(len(call('/me/conversations', token=joined)[1]), 1, 'reactivated member recovers own team conversation')
+need(call(f'/teams/{tid}/members/{joined_info["id"]}', 'PATCH', {'role': 'team_owner', 'status': 'active'}, owner)[0], 200, 'owner transfers team ownership')
+need(call(f'/teams/{tid}/members/{joined_info["id"]}', 'PATCH', {'role': 'member', 'status': 'active'}, owner)[0], 403, 'former owner cannot demote new owner')
+need(call(f'/teams/{tid}/members/{owner_info["id"]}', 'PATCH', {'role': 'member', 'status': 'active'}, joined)[0], 200, 'new owner manages former owner')
+status, race_team = call('/teams', 'POST', {'name': 'Owner race ' + suffix, 'description': '', 'timezone': 'Asia/Shanghai'}, owner)
+need(status, 201, 'create isolated ownership race team')
+race_id = race_team['id']
+status, race_invite = call(f'/teams/{race_id}/invitations', 'POST', {'expiresInHours': 1, 'maxUses': 2}, owner)
+need(status, 201, 'invite two candidates for ownership race')
+need(call('/invitations/accept', 'POST', {'token': race_invite['token']}, joined)[0], 200, 'first owner candidate joins')
+need(call('/invitations/accept', 'POST', {'token': race_invite['token']}, other)[0], 200, 'second owner candidate joins')
+_, other_info = call('/me', token=other)
+with ThreadPoolExecutor(max_workers=2) as pool:
+    ownership = list(pool.map(lambda candidate: call(f'/teams/{race_id}/members/{candidate}', 'PATCH', {'role': 'team_owner', 'status': 'active'}, owner)[0], [joined_info['id'], other_info['id']]))
+need(sorted(ownership), [200, 403], 'concurrent transfers cannot create two owners')
+_, race_members = call(f'/teams/{race_id}/members', token=joined)
+need(sum(m['role'] == 'team_owner' and m['status'] == 'active' for m in race_members), 1, 'ownership race leaves exactly one active owner')
+need(call('/auth/logout', 'POST', {}, owner)[0], 200, 'logout')
+need(call('/me', token=owner)[0], 401, 'revoked session rejected')
+status, reset = call('/auth/forgot', 'POST', {'email': owner_email})
+need(status, 200, 'request password reset')
+need(call('/auth/reset', 'POST', {'token': reset['resetToken'], 'password': password + 'new'})[0], 200, 'reset password')
+need(call('/auth/reset', 'POST', {'token': reset['resetToken'], 'password': password + 'new'})[0], 400, 'reset token one-time')
+_, owner_login = call('/auth/login', 'POST', {'email': owner_email, 'password': password + 'new'})
+owner_session = owner_login['accessToken']
+session_status, listed_sessions = call('/auth/sessions', token=owner_session)
+need(session_status, 200, 'list active sessions')
+need(sum(bool(session['current']) for session in listed_sessions), 1, 'identify the current session without revealing its token')
+refresh_status, refreshed = call('/auth/refresh', 'POST', token=owner_session)
+need(refresh_status, 200, 'renew current session')
+need(call('/me', token=owner_session)[0], 401, 'renewal revokes previous session')
+need(call('/me', token=refreshed['accessToken'])[0], 200, 'renewed session is active')
+need(call('/auth/password', 'POST', {'current': password + 'new', 'password': password + 'changed'}, refreshed['accessToken'])[0], 200, 'change password')
+need(call('/me', token=refreshed['accessToken'])[0], 401, 'password change revokes every session')
+need(call('/auth/login', 'POST', {'email': owner_email, 'password': password + 'changed'})[0], 200, 'new password signs in')
+need(call('/auth/login', 'POST', {'email': owner_email, 'password': password + 'new'})[0], 401, 'old password no longer signs in')
+print('API acceptance passed; team:', tid)

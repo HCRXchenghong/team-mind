@@ -1,0 +1,23 @@
+{
+  "name": "@teammind/wechat-plugin-bridge",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24.16.0 <25 || >=26.1.0"
+  },
+  "dependencies": {
+    "@tencent-weixin/openclaw-weixin": "2.4.10",
+    "openclaw": "2026.10.4"
+  },
+  "overrides": {
+    "openclaw": {
+      "npm": "11.21.1"
+    }
+  },
+  "scripts": {
+    "patch:wechat-plugin": "node ./patch-wechat-plugin.mjs",
+    "start": "npm run patch:wechat-plugin && node ./run-gateway.mjs",
+    "test": "npm run patch:wechat-plugin && node --test"
+  }
+}

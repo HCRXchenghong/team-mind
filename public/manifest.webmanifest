@@ -1,0 +1,27 @@
+{
+  "name": "TeamMind 团队协作平台",
+  "short_name": "TeamMind",
+  "description": "TeamMind 团队协作与项目管理",
+  "lang": "zh-CN",
+  "start_url": "/login",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "theme_color": "#307af2",
+  "background_color": "#f2f3f5",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

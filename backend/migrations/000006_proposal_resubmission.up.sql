@@ -1,0 +1,2 @@
+ALTER TABLE plan_change_approvals DROP INDEX uq_proposal_approval_decision;
+CREATE INDEX idx_proposal_approval_history ON plan_change_approvals(proposal_id, created_at);

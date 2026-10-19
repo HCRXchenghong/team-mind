@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TeamMind</string>
+    <string name="title_activity_main">TeamMind</string>
+    <string name="package_name">com.teammind.workspace</string>
+    <string name="custom_url_scheme">com.teammind.workspace</string>
+</resources>

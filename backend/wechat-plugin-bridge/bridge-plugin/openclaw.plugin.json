@@ -1,0 +1,12 @@
+{
+  "id": "teammind-wechat-bridge",
+  "name": "TeamMind WeChat Bridge",
+  "description": "Loopback-only authenticated QR session bridge for TeamMind",
+  "version": "1.0.0",
+  "extensions": ["./index.mjs"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
