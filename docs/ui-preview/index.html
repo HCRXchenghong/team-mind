@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TeamMind 前端重建 · UI 库选型与预览</title>
+<style>
+  :root {
+    --bg: #09090b;
+    --bg-2: #0f0f12;
+    --panel: #131316;
+    --panel-2: #18181c;
+    --line: #26262b;
+    --line-2: #323239;
+    --text: #f4f4f5;
+    --muted: #a1a1aa;
+    --dim: #71717a;
+    --lime: #d4ff5f;
+    --lime-dim: rgba(212, 255, 95, .12);
+    --blue: #8fb3ff;
+    --orange: #ffb86b;
+    --red: #ff8f8f;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  ::selection { background: var(--lime); color: #0a0a0b; }
+
+  .wrap { width: min(1180px, calc(100% - 48px)); margin: 0 auto; }
+
+  /* 顶部导航 */
+  .topbar {
+    position: sticky; top: 0; z-index: 50; backdrop-filter: blur(14px);
+    background: rgba(9, 9, 11, .78); border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner { display: flex; align-items: center; justify-content: space-between; height: 58px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -.01em; }
+  .brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--lime); color: #09090b; display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+  .nav { display: flex; gap: 22px; font-size: 13px; color: var(--muted); }
+  .nav a:hover { color: var(--text); }
+  .topbar-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--dim); }
+  .tag { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 11.5px; color: var(--muted); }
+  .tag.lime { border-color: transparent; background: var(--lime-dim); color: var(--lime); }
+  .decision {
+    display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
+    padding: 9px 16px; background: var(--lime); color: #0a0a0b; font-size: 12.5px; font-weight: 600;
+  }
+  .decision span { font-weight: 400; opacity: .75; }
+
+  /* Hero */
+  .hero { position: relative; padding: 74px 0 54px; overflow: hidden; }
+  .hero::before {
+    content: ""; position: absolute; inset: -20% 30% auto -10%; height: 520px;
+    background: radial-gradient(ellipse at center, rgba(212,255,95,.14), transparent 62%);
+    filter: blur(10px); pointer-events: none;
+  }
+  .hero-grid { position: relative; display: grid; grid-template-columns: 1.35fr .65fr; gap: 48px; align-items: end; }
+  .eyebrow { display: flex; align-items: center; gap: 10px; font-size: 11.5px; letter-spacing: .16em; color: var(--lime); text-transform: uppercase; }
+  .eyebrow::before { content: ""; width: 26px; height: 1px; background: var(--lime); opacity: .7; }
+  h1 { margin: 20px 0 0; font-size: clamp(38px, 5.2vw, 62px); line-height: 1.06; letter-spacing: -.035em; font-weight: 650; }
+  h1 em { font-style: normal; color: var(--lime); }
+  .lede { margin: 22px 0 0; max-width: 640px; font-size: 15.5px; line-height: 1.75; color: var(--muted); }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px; border-radius: 999px;
+    border: 1px solid var(--line-2); background: var(--panel); color: var(--text); font-size: 13.5px; font-weight: 500;
+  }
+  .btn:hover { border-color: #4b4b54; background: var(--panel-2); }
+  .btn.primary { background: var(--lime); color: #0a0a0b; border-color: var(--lime); font-weight: 650; }
+  .btn.primary:hover { filter: brightness(1.05); }
+
+  .hero-side { border: 1px solid var(--line); border-radius: var(--radius); background: linear-gradient(180deg, var(--panel), #0d0d10); padding: 20px; }
+  .hero-side h3 { margin: 0 0 14px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+  .hero-stat { display: flex; justify-content: space-between; align-items: baseline; padding: 11px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .hero-stat:first-of-type { border-top: 0; }
+  .hero-stat b { font-size: 20px; color: var(--text); font-weight: 600; letter-spacing: -.02em; }
+  .hero-stat b small { font-size: 12px; color: var(--dim); font-weight: 400; margin-left: 3px; }
+
+  /* 通用区块 */
+  section { padding: 58px 0; border-top: 1px solid var(--line); }
+  .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
+  .kicker { font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+  h2 { margin: 8px 0 0; font-size: 28px; line-height: 1.25; letter-spacing: -.02em; font-weight: 650; }
+  .section-head p { margin: 0; max-width: 420px; color: var(--muted); font-size: 13px; }
+
+  /* 需求画像 */
+  .needs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .need { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 18px; }
+  .need .idx { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .need h4 { margin: 8px 0 6px; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+  .need p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.65; }
+  .need .libs { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 11px; color: var(--dim); border: 1px solid var(--line-2); border-radius: 6px; padding: 2px 7px; }
+
+  /* 预览 */
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .tab {
+    display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 13px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: 12.5px; cursor: pointer;
+    font-family: inherit;
+  }
+  .tab .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dot, #777); }
+  .tab:hover { color: var(--text); border-color: var(--line-2); }
+  .tab.active { background: var(--text); color: #0a0a0b; border-color: var(--text); font-weight: 600; }
+  .tab.active .dot { box-shadow: 0 0 0 2px rgba(0,0,0,.18); }
+  .tab small { font-size: 10.5px; opacity: .6; }
+
+  .preview-shell { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
+  .preview-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    height: 44px; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--panel-2);
+    font-size: 12px; color: var(--muted);
+  }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 9px; height: 9px; border-radius: 50%; background: #3a3a40; }
+  .preview-bar .url { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--dim); }
+  .preview-bar .open { color: var(--blue); }
+  .preview-bar .open:hover { text-decoration: underline; }
+  .frame-wrap { position: relative; height: 880px; background: #f6f7f9; }
+  .frame-wrap iframe { width: 100%; height: 100%; border: 0; display: block; }
+  .loading { position: absolute; inset: 0; display: none; place-items: center; background: #f6f7f9; color: #52525b; font-size: 13px; }
+  .loading.show { display: grid; }
+  .preview-note { margin: 10px 2px 0; font-size: 12px; color: var(--dim); }
+  .preview-note b { color: var(--muted); font-weight: 500; }
+
+  /* 评分表 */
+  .score-card { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 13px; }
+  thead th { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); font-weight: 600; background: var(--bg-2); }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.dim, th.dim { color: var(--dim); font-size: 12px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .total { display: flex; align-items: center; gap: 10px; }
+  .total b { font-size: 15px; letter-spacing: -.01em; }
+  .bar { height: 6px; border-radius: 999px; background: var(--panel-2); overflow: hidden; width: 100%; min-width: 90px; }
+  .bar i { display: block; height: 100%; border-radius: 999px; background: var(--lime); }
+  .winner { background: rgba(212, 255, 95, .045); }
+  .winner td { color: var(--text); }
+  .badge-rec { display: inline-flex; height: 18px; align-items: center; padding: 0 7px; border-radius: 999px; background: var(--lime); color: #0a0a0b; font-size: 10.5px; font-weight: 700; margin-left: 6px; }
+
+  /* 对比矩阵 */
+  .matrix-card { border: 1px solid var(--line); border-radius: var(--radius); overflow: auto; background: var(--panel); }
+  .matrix { min-width: 980px; }
+  .matrix th, .matrix td { padding: 11px 13px; font-size: 12.5px; vertical-align: top; }
+  .matrix thead th { position: sticky; top: 0; z-index: 2; }
+  .matrix tbody th { font-weight: 500; color: var(--muted); white-space: nowrap; background: var(--panel); }
+  .yes { color: var(--lime); }
+  .mid { color: var(--orange); }
+  .no { color: var(--red); }
+  .cell-note { display: block; color: var(--dim); font-size: 11px; margin-top: 2px; line-height: 1.5; }
+
+  /* 推荐 */
+  .verdicts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .verdict { position: relative; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: 22px; }
+  .verdict.primary { border-color: rgba(212,255,95,.5); background: linear-gradient(180deg, rgba(212,255,95,.07), var(--panel) 46%); }
+  .verdict .role { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+  .verdict h3 { margin: 6px 0 2px; font-size: 19px; letter-spacing: -.015em; }
+  .verdict .ver { font-size: 12px; color: var(--dim); }
+  .verdict p { margin: 12px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
+  .verdict ul { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .verdict li { position: relative; padding-left: 15px; color: var(--muted); font-size: 12.5px; }
+  .verdict li::before { content: "→"; position: absolute; left: 0; color: var(--lime); }
+  .verdict li.warn::before { content: "!"; color: var(--orange); }
+
+  /* 落地 */
+  .steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; counter-reset: step; }
+  .step { border: 1px solid var(--line); border-radius: 12px; padding: 18px; background: var(--panel); }
+  .step::before { counter-increment: step; content: "0" counter(step); font-size: 11px; color: var(--lime); font-variant-numeric: tabular-nums; letter-spacing: .08em; }
+  .step h4 { margin: 10px 0 6px; font-size: 14px; font-weight: 600; }
+  .step p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.65; }
+  .step code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--text); background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+
+  .callout { margin-top: 14px; display: flex; gap: 14px; align-items: flex-start; border: 1px dashed var(--line-2); border-radius: 12px; padding: 16px 18px; color: var(--muted); font-size: 12.5px; }
+  .callout b { color: var(--text); font-weight: 600; }
+  .callout a { color: var(--lime); border-bottom: 1px solid rgba(212,255,95,.35); }
+
+  footer { border-top: 1px solid var(--line); padding: 34px 0 46px; color: var(--dim); font-size: 12px; }
+  .foot { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+  .foot a:hover { color: var(--text); }
+
+  @media (max-width: 960px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 28px; }
+    .needs, .verdicts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .nav { display: none; }
+    .frame-wrap { height: 700px; }
+  }
+  @media (max-width: 620px) {
+    .wrap { width: calc(100% - 28px); }
+    .needs, .verdicts, .steps { grid-template-columns: 1fr; }
+    .hero { padding: 46px 0 36px; }
+    .section-head { flex-direction: column; align-items: flex-start; }
+    .frame-wrap { height: 620px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap topbar-inner">
+    <div class="brand"><span class="brand-mark">T</span> TeamMind <span style="color:var(--dim);font-weight:400">/ 前端选型</span></div>
+    <nav class="nav">
+      <a href="#needs">需求</a>
+      <a href="#preview">预览</a>
+      <a href="#score">评分</a>
+      <a href="#matrix">对比</a>
+      <a href="#verdict">结论</a>
+    </nav>
+    <div class="topbar-meta">
+      <span class="tag lime">2026.10.31</span>
+      <span class="tag">Vue 3.5</span>
+    </div>
+  </div>
+</div>
+
+<div class="decision">已采用 Ant Design Vue 4.2 完成重建 <span>· 2026-10-31 决策，本页保留为选型记录与对照预览</span></div>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow">Frontend rebuild · UI library review</div>
+      <h1>前端全部重做，<br>先把 UI 库<em>选对</em>。</h1>
+      <p class="lede">
+        旧前端（Vue 3 + Vite + Arco Design Vue）已完整删除，功能和接口清单归档在
+        <a href="../FRONTEND_FUNCTIONS_API.md" style="color:var(--text);border-bottom:1px solid var(--line-2)">FRONTEND_FUNCTIONS_API.md</a>。
+        这一页用于回答一个问题：<b style="color:var(--text);font-weight:600">下一版用哪个组件库，才撑得起“协作 + AI 工作台”的 14 个业务页面？</b>
+      </p>
+      <div class="hero-actions">
+        <a class="btn primary" href="#preview">看同一页面的真实渲染 →</a>
+        <a class="btn" href="#verdict">直接看推荐</a>
+      </div>
+    </div>
+    <aside class="hero-side">
+      <h3>本次评估</h3>
+      <div class="hero-stat"><span>候选库</span><b>6</b></div>
+      <div class="hero-stat"><span>真实组件渲染</span><b>5 <small>/ 6</small></b></div>
+      <div class="hero-stat"><span>统一对照组</span><b>1 <small>任务中心</small></b></div>
+      <div class="hero-stat"><span>评估维度</span><b>8 <small>加权</small></b></div>
+    </aside>
+  </div>
+</header>
+
+<section id="needs">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="kicker">01 · Requirement profile</div>
+        <h2>这个产品到底需要什么</h2>
+      </div>
+      <p>不是“哪个库好看”，而是哪套组件能覆盖 TeamMind 最重的六类界面，并且让 20–50 人团队的日常操作不别扭。</p>
+    </div>
+    <div class="needs">
+      <div class="need">
+        <div class="idx">01</div><h4>高密度数据表格</h4>
+        <p>任务、项目、成员、组织审核、审计日志：多条件筛选、排序、分页、行内操作、固定列、空状态。</p>
+        <div class="libs"><span class="chip">Table</span><span class="chip">Pagination</span><span class="chip">Fixed columns</span></div>
+      </div>
+      <div class="need">
+        <div class="idx">02</div><h4>表单与审批流</h4>
+        <p>新建/编辑弹窗、抽屉详情、提案变更、审批决策：校验、只读态、危险操作二次确认。</p>
+        <div class="libs"><span class="chip">Form</span><span class="chip">Modal</span><span class="chip">Drawer</span></div>
+      </div>
+      <div class="need">
+        <div class="idx">03</div><h4>AI 对话界面</h4>
+        <p>流式 Markdown、代码块、会话列表、工具调用结果、逐次授权开关；观感要像 AI 产品，而不是后台。</p>
+        <div class="libs"><span class="chip">Streaming</span><span class="chip">Markdown</span><span class="chip">Token</span></div>
+      </div>
+      <div class="need">
+        <div class="idx">04</div><h4>时间轴与甘特</h4>
+        <p>按天渲染、里程碑、依赖、今日线、120 天上限；没有库会内置，需要好的基础控件 + 自研 SVG/Canvas。</p>
+        <div class="libs"><span class="chip">Timeline</span><span class="chip">SVG</span><span class="chip">Date picker</span></div>
+      </div>
+      <div class="need">
+        <div class="idx">05</div><h4>双主题与设计 token</h4>
+        <p>亮/暗主题、品牌色、密度、圆角都要可调；最好能直接生成一套 TeamMind 设计语言。</p>
+        <div class="libs"><span class="chip">Dark mode</span><span class="chip">Theme</span><span class="chip">CSS vars</span></div>
+      </div>
+      <div class="need">
+        <div class="idx">06</div><h4>中文与移动端</h4>
+        <p>中文文档、中文日期/分页文案；≤900px 抽屉导航、表格横向滚动、弹窗不溢出。</p>
+        <div class="libs"><span class="chip">zh-CN</span><span class="chip">Responsive</span><span class="chip">A11y</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="preview">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="kicker">02 · Live preview</div>
+        <h2>同一个「任务中心」，六个库长什么样</h2>
+      </div>
+      <p>页面结构、数据、间距完全一致，只替换组件库。切换标签即可对比表格、标签、进度、筛选与暗色主题。</p>
+    </div>
+
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-src="demos/ant-design-vue.html" style="--dot:#1677ff"><span class="dot"></span>Ant Design Vue <small>4.2 · 已采用</small></button>
+      <button class="tab" data-src="demos/element-plus.html" style="--dot:#409eff"><span class="dot"></span>Element Plus <small>2.14</small></button>
+      <button class="tab" data-src="demos/naive-ui.html" style="--dot:#18a058"><span class="dot"></span>Naive UI <small>2.45</small></button>
+      <button class="tab" data-src="demos/tdesign.html" style="--dot:#0052d9"><span class="dot"></span>TDesign <small>1.20</small></button>
+      <button class="tab" data-src="demos/arco.html" style="--dot:#165dff"><span class="dot"></span>Arco Design <small>2.59</small></button>
+      <button class="tab" data-src="demos/shadcn-vue.html" style="--dot:#e4e4e7"><span class="dot"></span>shadcn-vue <small>静态</small></button>
+    </div>
+
+    <div class="preview-shell">
+      <div class="preview-bar">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <div class="url" id="frameUrl">demos/ant-design-vue.html</div>
+        <a class="open" id="frameOpen" href="demos/ant-design-vue.html" target="_blank" rel="noopener">在新窗口打开 ↗</a>
+      </div>
+      <div class="frame-wrap">
+        <div class="loading" id="loading">正在加载组件…</div>
+        <iframe id="frame" src="demos/ant-design-vue.html" title="UI 库预览"></iframe>
+      </div>
+    </div>
+    <div class="preview-note" id="previewNote"><b>真实组件：</b>Ant Design Vue 4.2.6（UMD 本地包），已用于正式重建。表格通过 customRender 生成，默认展示当前采用方案；右上角可切暗色。</div>
+  </div>
+</section>
+
+<section id="score">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="kicker">03 · Weighted score</div>
+        <h2>按 TeamMind 的权重打分</h2>
+      </div>
+      <p>1–5 分制，权重来自实际页面占比：表格最重，其次是表单、主题与 AI 适配；甘特图不指望库内置，只看承载力。</p>
+    </div>
+    <div class="score-card">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:190px">维度（权重）</th>
+            <th>Ant Design Vue</th>
+            <th>Element Plus</th>
+            <th>Naive UI</th>
+            <th>TDesign</th>
+            <th>Arco</th>
+            <th>shadcn-vue</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="dim">数据表格 / 列表（25%）</td><td class="num">5</td><td class="num">5</td><td class="num">5</td><td class="num">4</td><td class="num">4</td><td class="num">3</td></tr>
+          <tr><td class="dim">表单 / 弹窗 / 审批（15%）</td><td class="num">5</td><td class="num">5</td><td class="num">4</td><td class="num">4</td><td class="num">4</td><td class="num">4</td></tr>
+          <tr><td class="dim">AI 对话适配（10%）</td><td class="num">4</td><td class="num">4</td><td class="num">5</td><td class="num">5</td><td class="num">3</td><td class="num">5</td></tr>
+          <tr><td class="dim">时间轴 / 甘特承载（10%）</td><td class="num">3</td><td class="num">3</td><td class="num">3</td><td class="num">4</td><td class="num">3</td><td class="num">4</td></tr>
+          <tr><td class="dim">主题 / 暗色 / 设计自由度（15%）</td><td class="num">4</td><td class="num">3</td><td class="num">5</td><td class="num">4</td><td class="num">4</td><td class="num">5</td></tr>
+          <tr><td class="dim">中文生态 / 文档 / 招聘（10%）</td><td class="num">5</td><td class="num">5</td><td class="num">4</td><td class="num">4</td><td class="num">3</td><td class="num">3</td></tr>
+          <tr><td class="dim">体积 / 性能（10%）</td><td class="num">3</td><td class="num">3</td><td class="num">5</td><td class="num">4</td><td class="num">4</td><td class="num">4</td></tr>
+          <tr><td class="dim">移动端 / 响应式（5%）</td><td class="num">4</td><td class="num">4</td><td class="num">4</td><td class="num">4</td><td class="num">3</td><td class="num">4</td></tr>
+        </tbody>
+        <tfoot>
+          <tr class="winner">
+            <td><b>加权总分</b></td>
+            <td><div class="total"><b>4.30</b><span class="bar"><i style="width:86%"></i></span></div></td>
+            <td><div class="total"><b>4.15</b><span class="bar"><i style="width:83%"></i></span></div></td>
+            <td><div class="total"><b>4.50</b><span class="bar"><i style="width:90%"></i></span><span class="badge-rec">推荐</span></div></td>
+            <td><div class="total"><b>4.10</b><span class="bar"><i style="width:82%"></i></span></div></td>
+            <td><div class="total"><b>3.65</b><span class="bar"><i style="width:73%"></i></span></div></td>
+            <td><div class="total"><b>3.90</b><span class="bar"><i style="width:78%"></i></span></div></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="matrix">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="kicker">04 · Capability matrix</div>
+        <h2>关键能力逐项对比</h2>
+      </div>
+      <p>✓ 开箱即用；△ 能做但要自己补；✗ 明显短板。所有库均为 MIT 许可。</p>
+    </div>
+    <div class="matrix-card">
+      <table class="matrix">
+        <thead>
+          <tr><th style="width:150px">能力</th><th>Ant Design Vue</th><th>Element Plus</th><th>Naive UI</th><th>TDesign</th><th>Arco</th><th>shadcn-vue</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>组件数量</th><td><span class="yes">✓</span> 70+</td><td><span class="yes">✓</span> 70+</td><td><span class="yes">✓</span> 80+</td><td><span class="yes">✓</span> 60+</td><td><span class="yes">✓</span> 60+</td><td><span class="mid">△</span> 40+ 复制式</td></tr>
+          <tr><th>表格固定列 / 虚拟滚动</th><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span><span class="cell-note">virtual-scroll 独立组件</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="mid">△</span><span class="cell-note">TanStack Table 自组</span></td></tr>
+          <tr><th>表单校验</th><td><span class="yes">✓</span><span class="cell-note">async-validator</span></td><td><span class="yes">✓</span><span class="cell-note">async-validator</span></td><td><span class="yes">✓</span><span class="cell-note">rule 驱动</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="mid">△</span><span class="cell-note">vee-validate + zod</span></td></tr>
+          <tr><th>暗色主题</th><td><span class="yes">✓</span><span class="cell-note">darkAlgorithm</span></td><td><span class="yes">✓</span><span class="cell-note">需引 dark css</span></td><td><span class="yes">✓</span><span class="cell-note">darkTheme 对象</span></td><td><span class="yes">✓</span><span class="cell-note">theme-mode</span></td><td><span class="yes">✓</span><span class="cell-note">arco-theme</span></td><td><span class="yes">✓</span><span class="cell-note">.dark + CSS vars</span></td></tr>
+          <tr><th>设计 token 覆写</th><td><span class="yes">✓</span><span class="cell-note">ConfigProvider</span></td><td><span class="mid">△</span><span class="cell-note">CSS 变量为主</span></td><td><span class="yes">✓</span><span class="cell-note">themeOverrides 最强</span></td><td><span class="yes">✓</span><span class="cell-note">CSS vars</span></td><td><span class="yes">✓</span><span class="cell-note">CSS vars</span></td><td><span class="yes">✓</span><span class="cell-note">CSS vars / Tailwind</span></td></tr>
+          <tr><th>中文文档</th><td><span class="yes">✓</span> 完善</td><td><span class="yes">✓</span> 完善</td><td><span class="mid">△</span> 英文为主</td><td><span class="yes">✓</span> 完善</td><td><span class="yes">✓</span> 完善</td><td><span class="no">✗</span> 英文</td></tr>
+          <tr><th>中文日期 / 分页</th><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span> zhCN</td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="mid">△</span><span class="cell-note">自行拼</span></td></tr>
+          <tr><th>后台模板 / 起步脚手架</th><td><span class="yes">✓</span> 社区多</td><td><span class="yes">✓</span> 最多</td><td><span class="mid">△</span> 少而精</td><td><span class="yes">✓</span> Starter</td><td><span class="yes">✓</span> Arco Pro</td><td><span class="mid">△</span> Blocks</td></tr>
+          <tr><th>TypeScript 体验</th><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span> 最佳</td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><th>包体积（gzip 估算）</th><td><span class="mid">△</span> ~120 KB+</td><td><span class="mid">△</span> ~95 KB+</td><td><span class="yes">✓</span> 按需 ~70 KB+</td><td><span class="mid">△</span> ~100 KB+</td><td><span class="mid">△</span> ~95 KB+</td><td><span class="yes">✓</span> 只打包用到的</td></tr>
+          <tr><th>AI / 聊天场景观感</th><td><span class="mid">△</span> 偏后台</td><td><span class="mid">△</span> 偏后台</td><td><span class="yes">✓</span> 干净现代</td><td><span class="yes">✓</span> 协作感强</td><td><span class="mid">△</span> 偏后台</td><td><span class="yes">✓</span> AI 产品首选</td></tr>
+          <tr><th>甘特 / 时间轴</th><td colspan="6"><span class="mid">△</span> 六个库都不内置。需自研 SVG 时间轴，或引入 frappe-gantt / vis-timeline / dhtmlx-gantt（商业）。旧版自研 120 天时间轴可直接重画。</td></tr>
+          <tr><th>许可</th><td colspan="6"><span class="yes">✓</span> MIT（dhtmlx-gantt 商业授权需单独评估）</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="verdict">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="kicker">05 · Recommendation</div>
+        <h2>结论：最终采用 Ant Design Vue</h2>
+      </div>
+      <p>如果目标是“重做一版有自己气质的 AI 协作工作台”，Naive UI 的主题系统与观感最合适；如果目标是“三个月内把 14 个页面全部补齐”，Ant Design Vue 最省事。</p>
+    </div>
+    <div class="verdicts">
+      <div class="verdict">
+        <div class="role">当时评分第一</div>
+        <h3>Naive UI</h3>
+        <div class="ver" style="color:var(--dim)">v2.45 · MIT · TypeScript 优先</div>
+        <p>主题覆盖能力是六个里最强的：一套 themeOverrides 就能长出 TeamMind 自己的设计语言，暗色是原生一等公民，体积也最友好。</p>
+        <ul>
+          <li>表格、表单、树、穿梭框、日期、上传都齐全</li>
+          <li>AI 对话界面干净，不像“管理后台”</li>
+          <li>需要自建 Pro 壳（导航/标签页/面包屑）</li>
+          <li class="warn">中文文档偏少，团队需接受英文文档</li>
+        </ul>
+      </div>
+      <div class="verdict primary">
+        <div class="role">最终采用 · 交付最快</div>
+        <h3>Ant Design Vue</h3>
+        <div class="ver" style="color:var(--dim)">v4.2 · MIT · 企业级事实标准</div>
+        <p>组件最全、表格/表单/审批的模式最成熟，社区模板和中文资料最多；代价是视觉同质化、包体偏大。</p>
+        <ul>
+          <li>14 个页面可以最快复刻，风险最低</li>
+          <li>ConfigProvider + darkAlgorithm 主题够用</li>
+          <li>Pro 壳需要照搬 Arco Pro 的结构重写</li>
+          <li class="warn">容易看起来“和别的后台一样”</li>
+        </ul>
+      </div>
+      <div class="verdict">
+        <div class="role">品牌向 · 高投入</div>
+        <h3>shadcn-vue</h3>
+        <div class="ver" style="color:var(--dim)">复制式组件 · Tailwind CSS</div>
+        <p>最像现代 AI 产品，设计完全归你；但数据表格、筛选、甘特、表单校验都要自己组装，工期显著更长。</p>
+        <ul>
+          <li>对话、落地页、设置页会非常出彩</li>
+          <li>TanStack Table 可做出更强的任务表</li>
+          <li class="warn">需要稳定设计系统与前端人力</li>
+          <li class="warn">中文/复杂表单生态最弱</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout">
+      <div style="font-size:18px;line-height:1">◎</div>
+      <div>
+        <b>其余三个怎么放：</b>
+        Element Plus 只在“团队已经熟、招聘优先”时选；TDesign 适合未来要做 IM/审批中台的路线；Arco 是刚删掉的那一版，除非想沿用现有组件习惯，否则不建议原地打转。
+        <br><b>甘特图单独立项：</b>无论选谁，时间轴都要自研或引第三方，建议先做只读渲染 + CSV 导出，再接依赖连线与 AI 体检。
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="next">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="kicker">06 · Rebuild plan</div>
+        <h2>定库之后的四步</h2>
+      </div>
+      <p>前端代码已清空，仓库只剩后端、脚本与文档。建议按下面顺序起新工程，避免又长成第二个“能跑但难维护”的版本。</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <h4>定库 + 设计 token</h4>
+        <p>拍板 Naive UI 或 Ant Design Vue；先定色板、圆角、字号、间距、暗色映射，写进 <code>tokens.css</code>，再写第一个页面。</p>
+      </div>
+      <div class="step">
+        <h4>搭壳与请求层</h4>
+        <p>顶栏/侧栏/标签页/面包屑、组织切换、SSE 未读、401 拦截、分页与错误归一化。壳不稳，页面越多越乱。</p>
+      </div>
+      <div class="step">
+        <h4>按依赖顺序迁页</h4>
+        <p>登录 → 总览 → 任务 → 项目 → 甘特 → 审批 → 成员/部门 → 通知 → 设置 → AI → 平台。每页对着清单验收接口。</p>
+      </div>
+      <div class="step">
+        <h4>AI 与甘特单独攻坚</h4>
+        <p>流式 SSE、Markdown 消毒、逐次授权、工作区文件；甘特时间轴 SVG + 依赖 + 分享 token。这两块不要塞进通用组件里。</p>
+      </div>
+    </div>
+    <div class="callout">
+      <div style="font-size:18px;line-height:1">↗</div>
+      <div>
+        <b>先读这两份再动手：</b>
+        <a href="../FRONTEND_FUNCTIONS_API.md">前端功能与 API 清单</a>（19 个页面、全部接口、权限与坑）
+        · <a href="../ARCHITECTURE.md">架构说明</a>（后端模块与运行方式）。旧前端源码已打包在仓库根目录 <code style="font-family:ui-monospace,monospace">.archive/</code>，需要对照实现时再解压。
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div>TeamMind · 前端重建选型报告 · 2026-10-31</div>
+    <div>示例为本地 UMD 真实渲染；shadcn-vue 无 UMD 包，采用等价标记静态复刻。</div>
+  </div>
+</footer>
+
+<script>
+  const notes = {
+    'demos/ant-design-vue.html': '<b>真实组件：</b>Ant Design Vue 4.2.6（UMD 本地包）。标签为 Ant 5 风格的描边样式，表格通过 customRender 生成；右上角可切暗色。',
+    'demos/element-plus.html': '<b>真实组件：</b>Element Plus 2.14.7（UMD 本地包）。表头/表格使用库默认皮肤，标签为 light/plain 两种形态；右上角可切暗色。',
+    'demos/naive-ui.html': '<b>真实组件：</b>Naive UI 2.45.3（UMD 本地包）。表格用 render 函数生成单元格，主题通过 themeOverrides 控制；右上角可切暗色。',
+    'demos/tdesign.html': '<b>真实组件：</b>TDesign Vue Next 1.20.10（UMD 本地包）。标签 light/outline 混用，分页使用库内组件；右上角可切暗色。',
+    'demos/arco.html': '<b>真实组件：</b>Arco Design Vue 2.59.0（UMD 本地包）。也就是刚删除的旧前端技术栈，用于视觉对照；右上角可切暗色。',
+    'demos/shadcn-vue.html': '<b>静态复刻：</b>shadcn-vue 是复制进项目的组件集合，没有 UMD 包。这里用等价 Tailwind 标记与 token 复刻，仅示意视觉语言；交互（筛选/主题/弹窗）可用。'
+  };
+  const frame = document.getElementById('frame');
+  const url = document.getElementById('frameUrl');
+  const open = document.getElementById('frameOpen');
+  const note = document.getElementById('previewNote');
+  const loading = document.getElementById('loading');
+
+  document.getElementById('tabs').addEventListener('click', (event) => {
+    const tab = event.target.closest('.tab');
+    if (!tab) return;
+    document.querySelectorAll('.tab').forEach((el) => el.classList.remove('active'));
+    tab.classList.add('active');
+    const src = tab.dataset.src;
+    loading.classList.add('show');
+    frame.src = src;
+    url.textContent = src;
+    open.href = src;
+    note.innerHTML = notes[src] || '';
+  });
+
+  frame.addEventListener('load', () => loading.classList.remove('show'));
+</script>
+</body>
+</html>

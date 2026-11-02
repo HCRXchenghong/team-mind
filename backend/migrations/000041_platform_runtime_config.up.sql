@@ -1,0 +1,18 @@
+ALTER TABLE platform_settings
+  ADD COLUMN public_url VARCHAR(500) NULL,
+  ADD COLUMN smtp_host VARCHAR(255) NULL,
+  ADD COLUMN smtp_port VARCHAR(10) NULL,
+  ADD COLUMN smtp_user VARCHAR(255) NULL,
+  ADD COLUMN smtp_password_ciphertext BLOB NULL,
+  ADD COLUMN smtp_from VARCHAR(255) NULL,
+  ADD COLUMN smtp_tls_insecure BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN stt_provider VARCHAR(32) NULL,
+  ADD COLUMN stt_base_url VARCHAR(500) NULL,
+  ADD COLUMN stt_api_key_ciphertext BLOB NULL,
+  ADD COLUMN stt_model VARCHAR(120) NULL,
+  ADD COLUMN stt_language VARCHAR(20) NULL,
+  ADD COLUMN vapid_subject VARCHAR(255) NULL,
+  ADD COLUMN wechat_mode VARCHAR(20) NULL,
+  ADD COLUMN wechat_gateway_url VARCHAR(500) NULL,
+  ADD COLUMN wechat_gateway_bridge_token_ciphertext BLOB NULL,
+  ADD COLUMN updated_by BINARY(16) NULL;

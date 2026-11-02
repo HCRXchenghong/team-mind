@@ -1,0 +1,22 @@
+[
+  {
+    "id": "list_team_tasks",
+    "instruction": "列出当前团队的任务标题，最多 5 个。",
+    "expectTool": "list_team_tasks",
+    "expectAny": ["任务"]
+  },
+  {
+    "id": "python_math",
+    "instruction": "用 Python 计算 2 的 10 次方，并直接告诉我结果。",
+    "expectTool": "run_python",
+    "expectAny": ["1024"],
+    "allowCodeExecution": true
+  },
+  {
+    "id": "web_search",
+    "instruction": "联网查一下 OpenAI 是什么公司，给出来源链接。",
+    "expectTool": "web_search",
+    "expectAny": ["OpenAI"],
+    "allowWebAccess": true
+  }
+]

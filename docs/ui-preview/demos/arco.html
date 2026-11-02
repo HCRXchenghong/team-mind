@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arco Design Vue · TeamMind 预览</title>
+<link rel="stylesheet" href="../vendor/arco.css">
+<link rel="stylesheet" href="shell.css">
+<style>
+  :root { --tm-accent: #165dff; --tm-radius: 2px; }
+  .tm-panel .arco-table-th { background: var(--tm-panel-2); font-size: 12px; color: var(--tm-muted); font-weight: 600; }
+  .tm-panel .arco-table-td { border-bottom: 1px solid var(--tm-border); }
+  .tm-panel .arco-table { background: transparent; }
+  .arco-card { background: var(--tm-panel); }
+  .tm-kpi .arco-card-body { padding: 14px 16px; }
+  .arco-tag { font-weight: 500; }
+  .tm-filters .arco-input-wrapper, .tm-filters .arco-select-view { background: var(--tm-panel); }
+</style>
+</head>
+<body>
+<div id="boot-error" class="tm-boot-error" style="display:none"></div>
+<div id="app" v-cloak>
+  <div class="tm-app">
+    <aside class="tm-side">
+      <div class="tm-logo"><span class="tm-logo-mark">T</span> TeamMind</div>
+      <nav class="tm-nav">
+        <div class="tm-nav-label">工作台</div>
+        <a class="tm-nav-item"><span class="dot"></span>总览</a>
+        <a class="tm-nav-item active"><span class="dot"></span>任务中心</a>
+        <a class="tm-nav-item"><span class="dot"></span>项目管理</a>
+        <a class="tm-nav-item"><span class="dot"></span>甘特图</a>
+        <div class="tm-nav-label">协作</div>
+        <a class="tm-nav-item"><span class="dot"></span>审批中心</a>
+        <a class="tm-nav-item"><span class="dot"></span>成员</a>
+      </nav>
+      <div class="tm-side-foot">Arco Design Vue<br>2.59.0 · 字节跳动</div>
+    </aside>
+
+    <div class="tm-main">
+      <header class="tm-top">
+        <div class="tm-crumb">工作台 / <b>任务中心</b></div>
+        <div class="tm-top-right">
+          <a-select :model-value="'tm'" size="small" style="width: 132px">
+            <a-option value="tm">TeamMind 团队</a-option>
+            <a-option value="lab">AI 实验室</a-option>
+          </a-select>
+          <button class="tm-theme-btn" @click="toggleTheme">{{ dark ? '☀ 浅色' : '☾ 深色' }}</button>
+          <span class="tm-avatar">林</span>
+        </div>
+      </header>
+
+      <div class="tm-content">
+        <div class="tm-head">
+          <div>
+            <h1>任务中心</h1>
+            <p>6 个任务 · 2 个阻塞 · 本周 3 个到期</p>
+          </div>
+          <a-button type="primary" @click="createOpen = true">+ 新建任务</a-button>
+        </div>
+
+        <div class="tm-kpis">
+          <a-card v-for="k in kpis" :key="k.label" class="tm-kpi" :bordered="false">
+            <div class="tm-kpi-top"><span>{{ k.label }}</span><span>{{ k.tag }}</span></div>
+            <div class="tm-kpi-value">{{ k.value }}</div>
+            <div class="tm-kpi-foot" v-html="k.foot"></div>
+            <div class="tm-kpi-spark"><i :style="{ width: k.pct + '%' }"></i></div>
+          </a-card>
+        </div>
+
+        <div class="tm-filters">
+          <a-input-search v-model="q" placeholder="搜索任务标题" allow-clear style="width: 210px"></a-input-search>
+          <a-select v-model="status" style="width: 128px">
+            <a-option value="">全部状态</a-option>
+            <a-option value="todo">待开始</a-option>
+            <a-option value="doing">进行中</a-option>
+            <a-option value="blocked">阻塞</a-option>
+            <a-option value="review">待审查</a-option>
+            <a-option value="done">已完成</a-option>
+          </a-select>
+          <a-select v-model="project" style="width: 150px">
+            <a-option value="">全部项目</a-option>
+            <a-option value="工作台 2.0">工作台 2.0</a-option>
+            <a-option value="智能助手">智能助手</a-option>
+            <a-option value="流程引擎">流程引擎</a-option>
+            <a-option value="设置中心">设置中心</a-option>
+          </a-select>
+          <a-button :type="mine ? 'primary' : 'secondary'" @click="mine = !mine">我的任务</a-button>
+          <a-button @click="reset">重置</a-button>
+        </div>
+
+        <div class="tm-panel">
+          <div class="tm-table-wrap">
+            <a-table :data="filtered" :columns="columns" :pagination="false" row-key="id" size="small" :bordered="false">
+              <template v-slot:title="{ record }">
+                <div>
+                  <div class="tm-cell-title">{{ record.title }}</div>
+                  <div class="tm-cell-sub">{{ record.project }} · #{{ 1200 + record.id }}</div>
+                </div>
+              </template>
+              <template v-slot:status="{ record }">
+                <a-tag :color="statusColor(record.status)" size="small">{{ statusLabel(record.status) }}</a-tag>
+              </template>
+              <template v-slot:priority="{ record }">
+                <a-tag :color="priorityColor(record.priority)" size="small">{{ priorityLabel(record.priority) }}</a-tag>
+              </template>
+              <template v-slot:assignee="{ record }">
+                <div class="tm-who"><i :class="{ none: record.assignee === '未分配' }">{{ record.assignee.slice(0, 1) }}</i>{{ record.assignee }}</div>
+              </template>
+              <template v-slot:progress="{ record }">
+                <div class="tm-progress">
+                  <a-progress :percent="record.progress / 100" size="small" :show-text="false" style="flex:1"></a-progress>
+                  <span class="tm-progress-num">{{ record.progress }}%</span>
+                </div>
+              </template>
+              <template v-slot:actions="{ record }">
+                <div class="tm-actions">
+                  <a-button type="text" size="mini">详情</a-button>
+                  <a-button type="text" size="mini">编辑</a-button>
+                </div>
+              </template>
+            </a-table>
+            <div v-if="!filtered.length" class="tm-empty">没有符合条件的任务</div>
+          </div>
+          <div class="tm-table-foot">
+            <span>共 {{ filtered.length }} 条 · 每页 10 条</span>
+            <a-pagination :total="filtered.length" :page-size="10" size="small"></a-pagination>
+          </div>
+        </div>
+        <div class="tm-hint">真实组件渲染：Arco Design Vue 2.59（UMD）。表格、标签、进度条、分页、弹窗均为库内置组件。</div>
+      </div>
+    </div>
+  </div>
+
+  <a-modal v-model:visible="createOpen" title="新建任务" :on-before-ok="() => true">
+    <a-form :model="draft" layout="vertical">
+      <a-form-item label="任务标题"><a-input v-model="draft.title" placeholder="例如：补齐审批流批量处理"></a-input></a-form-item>
+      <a-form-item label="所属项目">
+        <a-select v-model="draft.project">
+          <a-option value="工作台 2.0">工作台 2.0</a-option>
+          <a-option value="智能助手">智能助手</a-option>
+        </a-select>
+      </a-form-item>
+    </a-form>
+  </a-modal>
+</div>
+
+<script src="../vendor/vue.global.prod.js"></script>
+<script src="../vendor/arco-vue.min.js"></script>
+<script>
+window.addEventListener('error', function (e) {
+  var el = document.getElementById('boot-error');
+  el.style.display = 'block';
+  el.textContent = 'JS ERROR: ' + e.message;
+});
+const { createApp, ref, reactive, computed, watchEffect } = Vue;
+
+const rows = [
+  { id: 1, title: '重构任务详情抽屉', project: '工作台 2.0', status: 'doing', priority: 'high', assignee: '林雅', due: '11-06', progress: 65, milestone: true },
+  { id: 2, title: '甘特图依赖连线', project: '工作台 2.0', status: 'blocked', priority: 'urgent', assignee: '陈默', due: '11-03', progress: 30 },
+  { id: 3, title: '审批流批量处理', project: '流程引擎', status: 'review', priority: 'medium', assignee: '苏禾', due: '11-12', progress: 88 },
+  { id: 4, title: '通知免打扰配置', project: '设置中心', status: 'todo', priority: 'low', assignee: '未分配', due: '11-18', progress: 0 },
+  { id: 5, title: 'AI 会话摘要缓存', project: '智能助手', status: 'done', priority: 'medium', assignee: '周野', due: '10-29', progress: 100 },
+  { id: 6, title: '公开甘特链接轮换', project: '工作台 2.0', status: 'doing', priority: 'high', assignee: '林雅', due: '11-09', progress: 45 },
+];
+
+createApp({
+  setup() {
+    const q = ref('');
+    const status = ref('');
+    const project = ref('');
+    const mine = ref(false);
+    const dark = ref(false);
+    const createOpen = ref(false);
+    const draft = reactive({ title: '', project: '工作台 2.0' });
+
+    const columns = [
+      { title: '任务', dataIndex: 'title', slotName: 'title', width: 260 },
+      { title: '状态', dataIndex: 'status', slotName: 'status', width: 96 },
+      { title: '优先级', dataIndex: 'priority', slotName: 'priority', width: 88 },
+      { title: '负责人', dataIndex: 'assignee', slotName: 'assignee', width: 120 },
+      { title: '进度', dataIndex: 'progress', slotName: 'progress', width: 150 },
+      { title: '截止', dataIndex: 'due', width: 76 },
+      { title: '操作', slotName: 'actions', width: 112 },
+    ];
+
+    const filtered = computed(() => rows.filter((r) => {
+      if (q.value && !r.title.includes(q.value)) return false;
+      if (status.value && r.status !== status.value) return false;
+      if (project.value && r.project !== project.value) return false;
+      if (mine.value && r.assignee !== '林雅') return false;
+      return true;
+    }));
+
+    const kpis = [
+      { label: '进行中', value: 12, tag: '+3 本周', foot: '较上周 <span class="up">↑ 12%</span>', pct: 62 },
+      { label: '阻塞', value: 2, tag: '需处理', foot: '平均阻塞 <span class="down">1.8 天</span>', pct: 18 },
+      { label: '待审批', value: 5, tag: '提案', foot: '本周已处理 9 条', pct: 40 },
+      { label: '本周完成', value: 18, tag: '目标 24', foot: '完成率 <span class="up">75%</span>', pct: 75 },
+    ];
+
+    const statusMap = { todo: '待开始', doing: '进行中', blocked: '阻塞', review: '待审查', done: '已完成', cancelled: '已取消' };
+    const statusColor = (s) => ({ todo: 'gray', doing: 'arcoblue', blocked: 'red', review: 'orange', done: 'green' })[s] || 'gray';
+    const priorityMap = { low: '低', medium: '中', high: '高', urgent: '紧急' };
+    const priorityColor = (p) => ({ low: 'gray', medium: 'arcoblue', high: 'orange', urgent: 'red' })[p] || 'gray';
+
+    function reset() { q.value = ''; status.value = ''; project.value = ''; mine.value = false; }
+    function toggleTheme() { dark.value = !dark.value; }
+
+    watchEffect(() => {
+      document.body.classList.toggle('dark', dark.value);
+      document.body.setAttribute('arco-theme', dark.value ? 'dark' : 'light');
+    });
+
+    return {
+      q, status, project, mine, dark, createOpen, draft, columns, filtered, kpis,
+      statusLabel: (s) => statusMap[s] || s, statusColor,
+      priorityLabel: (p) => priorityMap[p] || p, priorityColor,
+      reset, toggleTheme,
+    };
+  },
+}).use(ArcoVue).mount('#app');
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+CREATE TABLE platform_settings (
+  id TINYINT NOT NULL PRIMARY KEY,
+  registration_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO platform_settings(id, registration_enabled) VALUES(1, TRUE);

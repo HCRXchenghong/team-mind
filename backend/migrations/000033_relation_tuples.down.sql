@@ -1,0 +1,15 @@
+DROP TRIGGER IF EXISTS trg_relation_membership_ai;
+DROP TRIGGER IF EXISTS trg_relation_membership_au;
+DROP TRIGGER IF EXISTS trg_relation_membership_ad;
+DROP TRIGGER IF EXISTS trg_relation_department_ai;
+DROP TRIGGER IF EXISTS trg_relation_department_au;
+DROP TRIGGER IF EXISTS trg_relation_department_ad;
+DROP TRIGGER IF EXISTS trg_relation_project_ai;
+DROP TRIGGER IF EXISTS trg_relation_project_au;
+DROP TRIGGER IF EXISTS trg_relation_project_ad;
+DROP TRIGGER IF EXISTS trg_relation_task_ai;
+DROP TRIGGER IF EXISTS trg_relation_task_au;
+DROP TRIGGER IF EXISTS trg_relation_task_ad;
+DROP TRIGGER IF EXISTS trg_relation_collab_ai;
+DROP TRIGGER IF EXISTS trg_relation_collab_ad;
+DROP TABLE IF EXISTS relation_tuples;

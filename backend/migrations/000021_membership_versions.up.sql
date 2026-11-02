@@ -1,0 +1,2 @@
+ALTER TABLE team_memberships
+  ADD COLUMN version BIGINT UNSIGNED NOT NULL DEFAULT 1 AFTER status;

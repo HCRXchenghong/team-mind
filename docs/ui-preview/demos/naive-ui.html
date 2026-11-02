@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Naive UI · TeamMind 预览</title>
+<link rel="stylesheet" href="shell.css">
+<style>
+  :root { --tm-accent: #18a058; --tm-radius: 3px; }
+  .tm-panel .n-data-table { --n-merged-th-color: var(--tm-panel-2); --n-merged-td-color: transparent; --n-merged-border-color: var(--tm-border); }
+  .tm-kpi .n-card__content { padding: 14px 16px; }
+  .tm-kpi.n-card { background: var(--tm-panel); border-color: var(--tm-border); }
+  .tm-panel { background: var(--tm-panel); }
+  .n-tag { font-weight: 500; }
+  .tm-actions .n-button + .n-button { margin-left: 6px; }
+</style>
+</head>
+<body>
+<div id="boot-error" class="tm-boot-error" style="display:none"></div>
+<div id="app" v-cloak>
+  <n-config-provider :theme="dark ? darkTheme : null" :theme-overrides="overrides">
+    <div class="tm-app">
+      <aside class="tm-side">
+        <div class="tm-logo"><span class="tm-logo-mark">T</span> TeamMind</div>
+        <nav class="tm-nav">
+          <div class="tm-nav-label">工作台</div>
+          <a class="tm-nav-item"><span class="dot"></span>总览</a>
+          <a class="tm-nav-item active"><span class="dot"></span>任务中心</a>
+          <a class="tm-nav-item"><span class="dot"></span>项目管理</a>
+          <a class="tm-nav-item"><span class="dot"></span>甘特图</a>
+          <div class="tm-nav-label">协作</div>
+          <a class="tm-nav-item"><span class="dot"></span>审批中心</a>
+          <a class="tm-nav-item"><span class="dot"></span>成员</a>
+        </nav>
+        <div class="tm-side-foot">Naive UI<br>2.45.3 · 社区</div>
+      </aside>
+
+      <div class="tm-main">
+        <header class="tm-top">
+          <div class="tm-crumb">工作台 / <b>任务中心</b></div>
+          <div class="tm-top-right">
+            <n-select :options="teamOptions" value="tm" size="small" style="width: 140px"></n-select>
+            <button class="tm-theme-btn" @click="toggleTheme">{{ dark ? '☀ 浅色' : '☾ 深色' }}</button>
+            <span class="tm-avatar">林</span>
+          </div>
+        </header>
+
+        <div class="tm-content">
+          <div class="tm-head">
+            <div>
+              <h1>任务中心</h1>
+              <p>6 个任务 · 2 个阻塞 · 本周 3 个到期</p>
+            </div>
+            <n-button type="primary" @click="createOpen = true">+ 新建任务</n-button>
+          </div>
+
+          <div class="tm-kpis">
+            <n-card v-for="k in kpis" :key="k.label" class="tm-kpi" :bordered="true" size="small">
+              <div class="tm-kpi-top"><span>{{ k.label }}</span><span>{{ k.tag }}</span></div>
+              <div class="tm-kpi-value">{{ k.value }}</div>
+              <div class="tm-kpi-foot" v-html="k.foot"></div>
+              <div class="tm-kpi-spark"><i :style="{ width: k.pct + '%' }"></i></div>
+            </n-card>
+          </div>
+
+          <div class="tm-filters">
+            <n-input v-model:value="q" placeholder="搜索任务标题" clearable style="width: 210px"></n-input>
+            <n-select v-model:value="status" :options="statusOptions" style="width: 128px"></n-select>
+            <n-select v-model:value="project" :options="projectOptions" style="width: 150px"></n-select>
+            <n-button :type="mine ? 'primary' : 'default'" @click="mine = !mine">我的任务</n-button>
+            <n-button quaternary @click="reset">重置</n-button>
+          </div>
+
+          <div class="tm-panel">
+            <div class="tm-table-wrap">
+              <n-data-table :columns="columns" :data="filtered" :row-key="(r) => r.id" size="small" :bordered="false" :single-line="false"></n-data-table>
+            </div>
+            <div class="tm-table-foot">
+              <span>共 {{ filtered.length }} 条</span>
+              <n-pagination :item-count="filtered.length" :page-size="10" size="small"></n-pagination>
+            </div>
+          </div>
+          <div class="tm-hint">真实组件渲染：Naive UI 2.45（UMD）。表格单元格通过 render 函数生成，标签、进度条、分页、弹窗均为库内置组件。</div>
+        </div>
+      </div>
+    </div>
+
+    <n-modal v-model:show="createOpen" preset="card" title="新建任务" style="width: 480px">
+      <n-form label-placement="top">
+        <n-form-item label="任务标题"><n-input v-model:value="draft.title" placeholder="例如：补齐审批流批量处理"></n-input></n-form-item>
+        <n-form-item label="所属项目">
+          <n-select v-model:value="draft.project" :options="[{ label: '工作台 2.0', value: '工作台 2.0' }, { label: '智能助手', value: '智能助手' }]" style="width: 100%"></n-select>
+        </n-form-item>
+      </n-form>
+      <template #footer>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <n-button @click="createOpen = false">取消</n-button>
+          <n-button type="primary" @click="createOpen = false">创建</n-button>
+        </div>
+      </template>
+    </n-modal>
+  </n-config-provider>
+</div>
+
+<script src="../vendor/vue.global.prod.js"></script>
+<script src="../vendor/naive-ui.js"></script>
+<script>
+window.addEventListener('error', function (e) {
+  var el = document.getElementById('boot-error');
+  el.style.display = 'block';
+  el.textContent = 'JS ERROR: ' + e.message;
+});
+const { createApp, ref, reactive, computed, watchEffect, h } = Vue;
+const N = window.naive;
+
+const rows = [
+  { id: 1, title: '重构任务详情抽屉', project: '工作台 2.0', status: 'doing', priority: 'high', assignee: '林雅', due: '11-06', progress: 65 },
+  { id: 2, title: '甘特图依赖连线', project: '工作台 2.0', status: 'blocked', priority: 'urgent', assignee: '陈默', due: '11-03', progress: 30 },
+  { id: 3, title: '审批流批量处理', project: '流程引擎', status: 'review', priority: 'medium', assignee: '苏禾', due: '11-12', progress: 88 },
+  { id: 4, title: '通知免打扰配置', project: '设置中心', status: 'todo', priority: 'low', assignee: '未分配', due: '11-18', progress: 0 },
+  { id: 5, title: 'AI 会话摘要缓存', project: '智能助手', status: 'done', priority: 'medium', assignee: '周野', due: '10-29', progress: 100 },
+  { id: 6, title: '公开甘特链接轮换', project: '工作台 2.0', status: 'doing', priority: 'high', assignee: '林雅', due: '11-09', progress: 45 },
+];
+
+createApp({
+  setup() {
+    const q = ref('');
+    const status = ref('all');
+    const project = ref('all');
+    const mine = ref(false);
+    const dark = ref(false);
+    const createOpen = ref(false);
+    const draft = reactive({ title: '', project: '工作台 2.0' });
+    const darkTheme = N.darkTheme;
+
+    const teamOptions = [{ label: 'TeamMind 团队', value: 'tm' }, { label: 'AI 实验室', value: 'lab' }];
+    const statusOptions = [
+      { label: '全部状态', value: 'all' }, { label: '待开始', value: 'todo' }, { label: '进行中', value: 'doing' },
+      { label: '阻塞', value: 'blocked' }, { label: '待审查', value: 'review' }, { label: '已完成', value: 'done' },
+    ];
+    const projectOptions = [
+      { label: '全部项目', value: 'all' }, { label: '工作台 2.0', value: '工作台 2.0' },
+      { label: '智能助手', value: '智能助手' }, { label: '流程引擎', value: '流程引擎' }, { label: '设置中心', value: '设置中心' },
+    ];
+
+    const statusMap = { todo: '待开始', doing: '进行中', blocked: '阻塞', review: '待审查', done: '已完成' };
+    const statusType = (s) => ({ todo: 'default', doing: 'info', blocked: 'error', review: 'warning', done: 'success' })[s] || 'default';
+    const priorityMap = { low: '低', medium: '中', high: '高', urgent: '紧急' };
+    const priorityType = (p) => ({ low: 'default', medium: 'info', high: 'warning', urgent: 'error' })[p] || 'default';
+
+    const columns = [
+      {
+        title: '任务', key: 'title', width: 260,
+        render: (row) => h('div', [
+          h('div', { class: 'tm-cell-title' }, row.title),
+          h('div', { class: 'tm-cell-sub' }, row.project + ' · #' + (1200 + row.id)),
+        ]),
+      },
+      {
+        title: '状态', key: 'status', width: 100,
+        render: (row) => h(N.NTag, { type: statusType(row.status), size: 'small', bordered: false }, { default: () => statusMap[row.status] || row.status }),
+      },
+      {
+        title: '优先级', key: 'priority', width: 92,
+        render: (row) => h(N.NTag, { type: priorityType(row.priority), size: 'small', bordered: true }, { default: () => priorityMap[row.priority] || row.priority }),
+      },
+      {
+        title: '负责人', key: 'assignee', width: 124,
+        render: (row) => h('div', { class: 'tm-who' }, [
+          h('i', { class: row.assignee === '未分配' ? 'none' : '' }, row.assignee.slice(0, 1)),
+          row.assignee,
+        ]),
+      },
+      {
+        title: '进度', key: 'progress', width: 160,
+        render: (row) => h('div', { class: 'tm-progress' }, [
+          h(N.NProgress, { percentage: row.progress, showIndicator: false, height: 6, color: '#18a058', style: { flex: 1 } }),
+          h('span', { class: 'tm-progress-num' }, row.progress + '%'),
+        ]),
+      },
+      { title: '截止', key: 'due', width: 84 },
+      {
+        title: '操作', key: 'actions', width: 116,
+        render: () => h('div', { class: 'tm-actions' }, [
+          h(N.NButton, { text: true, type: 'primary', size: 'small' }, { default: () => '详情' }),
+          h(N.NButton, { text: true, size: 'small' }, { default: () => '编辑' }),
+        ]),
+      },
+    ];
+
+    const filtered = computed(() => rows.filter((r) => {
+      if (q.value && !r.title.includes(q.value)) return false;
+      if (status.value !== 'all' && r.status !== status.value) return false;
+      if (project.value !== 'all' && r.project !== project.value) return false;
+      if (mine.value && r.assignee !== '林雅') return false;
+      return true;
+    }));
+
+    const kpis = [
+      { label: '进行中', value: 12, tag: '+3 本周', foot: '较上周 <span class="up">↑ 12%</span>', pct: 62 },
+      { label: '阻塞', value: 2, tag: '需处理', foot: '平均阻塞 <span class="down">1.8 天</span>', pct: 18 },
+      { label: '待审批', value: 5, tag: '提案', foot: '本周已处理 9 条', pct: 40 },
+      { label: '本周完成', value: 18, tag: '目标 24', foot: '完成率 <span class="up">75%</span>', pct: 75 },
+    ];
+
+    const overrides = { common: { primaryColor: '#18a058', borderRadius: '3px', fontSize: '13px' } };
+
+    function reset() { q.value = ''; status.value = 'all'; project.value = 'all'; mine.value = false; }
+    function toggleTheme() { dark.value = !dark.value; }
+    watchEffect(() => { document.body.classList.toggle('dark', dark.value); });
+
+    return {
+      q, status, project, mine, dark, createOpen, draft, columns, filtered, kpis, overrides, darkTheme,
+      teamOptions, statusOptions, projectOptions, reset, toggleTheme,
+    };
+  },
+}).use({
+  install(app) {
+    ['NConfigProvider', 'NCard', 'NDataTable', 'NTag', 'NProgress', 'NSelect', 'NInput', 'NButton', 'NModal', 'NForm', 'NFormItem', 'NPagination']
+      .forEach((name) => app.component(name, N[name]));
+  },
+}).mount('#app');
+</script>
+</body>
+</html>

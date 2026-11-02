@@ -1,0 +1,20 @@
+CREATE TABLE agent_followups (
+  id BINARY(16) NOT NULL,
+  run_id BINARY(16) NOT NULL,
+  user_id BINARY(16) NOT NULL,
+  team_id BINARY(16) NULL,
+  conversation_id BINARY(16) NOT NULL,
+  approval_type VARCHAR(40) NOT NULL,
+  approval_id BINARY(16) NOT NULL,
+  decision VARCHAR(40) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  attempts INT NOT NULL DEFAULT 0,
+  last_error VARCHAR(500) NOT NULL DEFAULT '',
+  next_attempt_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uniq_agent_followup (run_id, approval_id),
+  KEY idx_agent_followup_status (status, next_attempt_at),
+  KEY idx_agent_followup_conversation (conversation_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

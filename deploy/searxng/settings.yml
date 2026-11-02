@@ -1,0 +1,16 @@
+use_default_settings: true
+
+general:
+  instance_name: "TeamMind Search"
+
+search:
+  safe_search: 1
+  formats:
+    - html
+    - json
+
+server:
+  # Replace before exposing the instance outside localhost.
+  secret_key: "change-me-teammind-searxng"
+  limiter: false
+  image_proxy: false

@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TDesign Vue Next · TeamMind 预览</title>
+<link rel="stylesheet" href="../vendor/tdesign.min.css">
+<link rel="stylesheet" href="shell.css">
+<style>
+  :root { --tm-accent: #0052d9; --tm-radius: 3px; }
+  .tm-panel .t-table th { background: var(--tm-panel-2); color: var(--tm-muted); font-weight: 600; font-size: 12px; }
+  .tm-panel .t-table td, .tm-panel .t-table th { border-color: var(--tm-border); }
+  .tm-panel .t-table { background: transparent; --td-bg-color-container: transparent; }
+  .tm-kpi .t-card__body { padding: 14px 16px; }
+  .t-tag { font-weight: 500; }
+</style>
+</head>
+<body>
+<div id="boot-error" class="tm-boot-error" style="display:none"></div>
+<div id="app" v-cloak>
+  <div class="tm-app">
+    <aside class="tm-side">
+      <div class="tm-logo"><span class="tm-logo-mark">T</span> TeamMind</div>
+      <nav class="tm-nav">
+        <div class="tm-nav-label">工作台</div>
+        <a class="tm-nav-item"><span class="dot"></span>总览</a>
+        <a class="tm-nav-item active"><span class="dot"></span>任务中心</a>
+        <a class="tm-nav-item"><span class="dot"></span>项目管理</a>
+        <a class="tm-nav-item"><span class="dot"></span>甘特图</a>
+        <div class="tm-nav-label">协作</div>
+        <a class="tm-nav-item"><span class="dot"></span>审批中心</a>
+        <a class="tm-nav-item"><span class="dot"></span>成员</a>
+      </nav>
+      <div class="tm-side-foot">TDesign Vue Next<br>1.20.10 · 腾讯</div>
+    </aside>
+
+    <div class="tm-main">
+      <header class="tm-top">
+        <div class="tm-crumb">工作台 / <b>任务中心</b></div>
+        <div class="tm-top-right">
+          <t-select model-value="tm" size="small" style="width: 140px">
+            <t-option label="TeamMind 团队" value="tm"></t-option>
+            <t-option label="AI 实验室" value="lab"></t-option>
+          </t-select>
+          <button class="tm-theme-btn" @click="toggleTheme">{{ dark ? '☀ 浅色' : '☾ 深色' }}</button>
+          <span class="tm-avatar">林</span>
+        </div>
+      </header>
+
+      <div class="tm-content">
+        <div class="tm-head">
+          <div>
+            <h1>任务中心</h1>
+            <p>6 个任务 · 2 个阻塞 · 本周 3 个到期</p>
+          </div>
+          <t-button theme="primary" @click="createOpen = true">+ 新建任务</t-button>
+        </div>
+
+        <div class="tm-kpis">
+          <t-card v-for="k in kpis" :key="k.label" class="tm-kpi" :bordered="true" shadow="never">
+            <div class="tm-kpi-top"><span>{{ k.label }}</span><span>{{ k.tag }}</span></div>
+            <div class="tm-kpi-value">{{ k.value }}</div>
+            <div class="tm-kpi-foot" v-html="k.foot"></div>
+            <div class="tm-kpi-spark"><i :style="{ width: k.pct + '%' }"></i></div>
+          </t-card>
+        </div>
+
+        <div class="tm-filters">
+          <t-input v-model="q" placeholder="搜索任务标题" clearable style="width: 210px"></t-input>
+          <t-select v-model="status" style="width: 128px">
+            <t-option label="全部状态" value="all"></t-option>
+            <t-option label="待开始" value="todo"></t-option>
+            <t-option label="进行中" value="doing"></t-option>
+            <t-option label="阻塞" value="blocked"></t-option>
+            <t-option label="待审查" value="review"></t-option>
+            <t-option label="已完成" value="done"></t-option>
+          </t-select>
+          <t-select v-model="project" style="width: 150px">
+            <t-option label="全部项目" value="all"></t-option>
+            <t-option label="工作台 2.0" value="工作台 2.0"></t-option>
+            <t-option label="智能助手" value="智能助手"></t-option>
+            <t-option label="流程引擎" value="流程引擎"></t-option>
+            <t-option label="设置中心" value="设置中心"></t-option>
+          </t-select>
+          <t-button :theme="mine ? 'primary' : 'default'" variant="outline" @click="mine = !mine">我的任务</t-button>
+          <t-button variant="text" @click="reset">重置</t-button>
+        </div>
+
+        <div class="tm-panel">
+          <div class="tm-table-wrap">
+            <t-table :data="filtered" :columns="columns" row-key="id" size="medium" :bordered="false" :hover="true">
+              <template #title="{ row }">
+                <div class="tm-cell-title">{{ row.title }}</div>
+                <div class="tm-cell-sub">{{ row.project }} · #{{ 1200 + row.id }}</div>
+              </template>
+              <template #status="{ row }">
+                <t-tag :theme="statusTheme(row.status)" variant="light" size="small">{{ statusLabel(row.status) }}</t-tag>
+              </template>
+              <template #priority="{ row }">
+                <t-tag :theme="priorityTheme(row.priority)" variant="outline" size="small">{{ priorityLabel(row.priority) }}</t-tag>
+              </template>
+              <template #assignee="{ row }">
+                <div class="tm-who"><i :class="{ none: row.assignee === '未分配' }">{{ row.assignee.slice(0, 1) }}</i>{{ row.assignee }}</div>
+              </template>
+              <template #progress="{ row }">
+                <div class="tm-progress">
+                  <t-progress :percentage="row.progress" :label="false" size="small" style="flex:1"></t-progress>
+                  <span class="tm-progress-num">{{ row.progress }}%</span>
+                </div>
+              </template>
+              <template #actions>
+                <div class="tm-actions">
+                  <t-button theme="primary" variant="text" size="small">详情</t-button>
+                  <t-button variant="text" size="small">编辑</t-button>
+                </div>
+              </template>
+            </t-table>
+            <div v-if="!filtered.length" class="tm-empty">没有符合条件的任务</div>
+          </div>
+          <div class="tm-table-foot">
+            <span>共 {{ filtered.length }} 条</span>
+            <t-pagination :total="filtered.length" :page-size="10" size="small" :show-jumper="false" :show-page-size="false"></t-pagination>
+          </div>
+        </div>
+        <div class="tm-hint">真实组件渲染：TDesign Vue Next 1.20（UMD）。表格、标签、进度条、分页、弹窗均为库内置组件。</div>
+      </div>
+    </div>
+  </div>
+
+  <t-dialog v-model:visible="createOpen" header="新建任务" :footer="false" width="480px">
+    <t-form label-align="top">
+      <t-form-item label="任务标题"><t-input v-model="draft.title" placeholder="例如：补齐审批流批量处理"></t-input></t-form-item>
+      <t-form-item label="所属项目">
+        <t-select v-model="draft.project" style="width: 100%">
+          <t-option label="工作台 2.0" value="工作台 2.0"></t-option>
+          <t-option label="智能助手" value="智能助手"></t-option>
+        </t-select>
+      </t-form-item>
+    </t-form>
+    <template #footer>
+      <t-button variant="outline" @click="createOpen = false">取消</t-button>
+      <t-button theme="primary" @click="createOpen = false">创建</t-button>
+    </template>
+  </t-dialog>
+</div>
+
+<script src="../vendor/vue.global.prod.js"></script>
+<script src="../vendor/tdesign.min.js"></script>
+<script>
+window.addEventListener('error', function (e) {
+  var el = document.getElementById('boot-error');
+  el.style.display = 'block';
+  el.textContent = 'JS ERROR: ' + e.message;
+});
+const { createApp, ref, reactive, computed, watchEffect } = Vue;
+
+const rows = [
+  { id: 1, title: '重构任务详情抽屉', project: '工作台 2.0', status: 'doing', priority: 'high', assignee: '林雅', due: '11-06', progress: 65 },
+  { id: 2, title: '甘特图依赖连线', project: '工作台 2.0', status: 'blocked', priority: 'urgent', assignee: '陈默', due: '11-03', progress: 30 },
+  { id: 3, title: '审批流批量处理', project: '流程引擎', status: 'review', priority: 'medium', assignee: '苏禾', due: '11-12', progress: 88 },
+  { id: 4, title: '通知免打扰配置', project: '设置中心', status: 'todo', priority: 'low', assignee: '未分配', due: '11-18', progress: 0 },
+  { id: 5, title: 'AI 会话摘要缓存', project: '智能助手', status: 'done', priority: 'medium', assignee: '周野', due: '10-29', progress: 100 },
+  { id: 6, title: '公开甘特链接轮换', project: '工作台 2.0', status: 'doing', priority: 'high', assignee: '林雅', due: '11-09', progress: 45 },
+];
+
+createApp({
+  setup() {
+    const q = ref('');
+    const status = ref('all');
+    const project = ref('all');
+    const mine = ref(false);
+    const dark = ref(false);
+    const createOpen = ref(false);
+    const draft = reactive({ title: '', project: '工作台 2.0' });
+
+    const columns = [
+      { colKey: 'title', title: '任务', width: 260 },
+      { colKey: 'status', title: '状态', width: 100 },
+      { colKey: 'priority', title: '优先级', width: 92 },
+      { colKey: 'assignee', title: '负责人', width: 124 },
+      { colKey: 'progress', title: '进度', width: 160 },
+      { colKey: 'due', title: '截止', width: 84 },
+      { colKey: 'actions', title: '操作', width: 116 },
+    ];
+
+    const filtered = computed(() => rows.filter((r) => {
+      if (q.value && !r.title.includes(q.value)) return false;
+      if (status.value !== 'all' && r.status !== status.value) return false;
+      if (project.value !== 'all' && r.project !== project.value) return false;
+      if (mine.value && r.assignee !== '林雅') return false;
+      return true;
+    }));
+
+    const kpis = [
+      { label: '进行中', value: 12, tag: '+3 本周', foot: '较上周 <span class="up">↑ 12%</span>', pct: 62 },
+      { label: '阻塞', value: 2, tag: '需处理', foot: '平均阻塞 <span class="down">1.8 天</span>', pct: 18 },
+      { label: '待审批', value: 5, tag: '提案', foot: '本周已处理 9 条', pct: 40 },
+      { label: '本周完成', value: 18, tag: '目标 24', foot: '完成率 <span class="up">75%</span>', pct: 75 },
+    ];
+
+    const statusMap = { todo: '待开始', doing: '进行中', blocked: '阻塞', review: '待审查', done: '已完成' };
+    const statusTheme = (s) => ({ todo: 'default', doing: 'primary', blocked: 'danger', review: 'warning', done: 'success' })[s] || 'default';
+    const priorityMap = { low: '低', medium: '中', high: '高', urgent: '紧急' };
+    const priorityTheme = (p) => ({ low: 'default', medium: 'primary', high: 'warning', urgent: 'danger' })[p] || 'default';
+
+    function reset() { q.value = ''; status.value = 'all'; project.value = 'all'; mine.value = false; }
+    function toggleTheme() { dark.value = !dark.value; }
+
+    watchEffect(() => {
+      document.documentElement.setAttribute('theme-mode', dark.value ? 'dark' : 'light');
+      document.body.classList.toggle('dark', dark.value);
+    });
+
+    return {
+      q, status, project, mine, dark, createOpen, draft, columns, filtered, kpis,
+      statusLabel: (s) => statusMap[s] || s, statusTheme,
+      priorityLabel: (p) => priorityMap[p] || p, priorityTheme,
+      reset, toggleTheme,
+    };
+  },
+}).use(TDesign).mount('#app');
+</script>
+</body>
+</html>

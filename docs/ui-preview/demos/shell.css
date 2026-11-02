@@ -1,0 +1,124 @@
+/* TeamMind UI 选型预览 · 统一外壳样式
+   目标：五个 demo 使用完全相同的信息架构，只让 UI 库决定控件与视觉语言。 */
+
+:root {
+  --tm-accent: #165dff;
+  --tm-bg: #f6f7f9;
+  --tm-panel: #ffffff;
+  --tm-panel-2: #fbfcfd;
+  --tm-border: #e7e9ee;
+  --tm-text: #171a20;
+  --tm-muted: #6f7787;
+  --tm-radius: 4px;
+  --tm-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+}
+body.dark {
+  --tm-bg: #0b0d12;
+  --tm-panel: #12151c;
+  --tm-panel-2: #171b23;
+  --tm-border: #242a36;
+  --tm-text: #e8eaf0;
+  --tm-muted: #8b93a3;
+  --tm-shadow: none;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--tm-bg);
+  color: var(--tm-text);
+  font: 13px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+[v-cloak] { display: none; }
+a { color: inherit; }
+
+.tm-app { display: flex; height: 100vh; overflow: hidden; }
+
+/* 侧栏 */
+.tm-side {
+  width: 212px; flex: none; display: flex; flex-direction: column;
+  padding: 16px 12px; background: var(--tm-panel);
+  border-right: 1px solid var(--tm-border);
+}
+.tm-logo { display: flex; align-items: center; gap: 9px; padding: 2px 8px 18px; font-weight: 650; font-size: 14px; letter-spacing: .2px; }
+.tm-logo-mark {
+  width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center;
+  background: var(--tm-accent); color: #fff; font-size: 14px; font-weight: 700;
+}
+.tm-nav { display: flex; flex-direction: column; gap: 2px; }
+.tm-nav-label { padding: 12px 8px 6px; font-size: 11px; color: var(--tm-muted); letter-spacing: .4px; }
+.tm-nav-item {
+  display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px;
+  border-radius: var(--tm-radius); color: var(--tm-text); text-decoration: none;
+  font-size: 13px; opacity: .82; cursor: default;
+}
+.tm-nav-item .dot { width: 6px; height: 6px; border-radius: 2px; background: currentColor; opacity: .35; }
+.tm-nav-item.active { background: color-mix(in srgb, var(--tm-accent) 12%, transparent); color: var(--tm-accent); opacity: 1; font-weight: 600; }
+.tm-nav-item.active .dot { opacity: 1; background: var(--tm-accent); }
+.tm-side-foot { margin-top: auto; padding: 12px 8px 2px; font-size: 11px; color: var(--tm-muted); line-height: 1.5; }
+
+/* 主区 */
+.tm-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tm-top {
+  height: 54px; flex: none; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 22px; background: var(--tm-panel); border-bottom: 1px solid var(--tm-border);
+}
+.tm-crumb { font-size: 12.5px; color: var(--tm-muted); }
+.tm-crumb b { color: var(--tm-text); font-weight: 600; }
+.tm-top-right { display: flex; align-items: center; gap: 10px; }
+.tm-theme-btn {
+  height: 28px; padding: 0 10px; border-radius: var(--tm-radius); cursor: pointer;
+  border: 1px solid var(--tm-border); background: var(--tm-panel-2); color: var(--tm-text); font-size: 12px;
+}
+.tm-theme-btn:hover { border-color: var(--tm-accent); color: var(--tm-accent); }
+.tm-avatar {
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--tm-accent); color: #fff; font-size: 12px; font-weight: 600;
+}
+
+.tm-content { flex: 1; overflow: auto; padding: 22px 24px 28px; }
+.tm-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.tm-head h1 { margin: 0; font-size: 22px; line-height: 1.3; font-weight: 650; letter-spacing: -.2px; }
+.tm-head p { margin: 5px 0 0; color: var(--tm-muted); font-size: 12.5px; }
+
+.tm-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tm-kpi { min-width: 0; }
+.tm-kpi-top { display: flex; justify-content: space-between; align-items: center; color: var(--tm-muted); font-size: 12px; }
+.tm-kpi-value { margin-top: 8px; font-size: 24px; font-weight: 650; line-height: 1.1; letter-spacing: -.4px; }
+.tm-kpi-foot { margin-top: 6px; font-size: 11.5px; color: var(--tm-muted); }
+.tm-kpi-foot .up { color: #16a34a; }
+.tm-kpi-foot .down { color: #dc2626; }
+.tm-kpi-spark { height: 3px; border-radius: 2px; margin-top: 10px; background: var(--tm-border); overflow: hidden; }
+.tm-kpi-spark i { display: block; height: 100%; background: var(--tm-accent); border-radius: 2px; }
+
+.tm-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 14px; }
+.tm-panel { background: var(--tm-panel); border: 1px solid var(--tm-border); border-radius: 10px; box-shadow: var(--tm-shadow); overflow: hidden; }
+.tm-table-wrap { overflow-x: auto; }
+.tm-table-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 14px; border-top: 1px solid var(--tm-border); color: var(--tm-muted); font-size: 12px;
+}
+.tm-cell-title { font-weight: 600; color: var(--tm-text); }
+.tm-cell-sub { margin-top: 2px; font-size: 11.5px; color: var(--tm-muted); }
+.tm-progress { display: flex; align-items: center; gap: 8px; min-width: 118px; }
+.tm-progress-num { width: 40px; flex: none; text-align: right; font-size: 11.5px; color: var(--tm-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tm-who { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.tm-who i {
+  width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--tm-accent) 14%, transparent); color: var(--tm-accent);
+  font-style: normal; font-size: 11px; font-weight: 600;
+}
+.tm-who .none { background: var(--tm-panel-2); color: var(--tm-muted); }
+.tm-actions { display: flex; gap: 2px; white-space: nowrap; }
+.tm-empty { padding: 40px 20px; text-align: center; color: var(--tm-muted); }
+
+.tm-hint { margin-top: 12px; font-size: 11.5px; color: var(--tm-muted); }
+.tm-boot-error { position: fixed; inset: auto 16px 16px 16px; z-index: 99; padding: 12px 14px; border-radius: 8px; background: #3b0d0d; color: #ffd9d9; font-family: ui-monospace, monospace; font-size: 12px; white-space: pre-wrap; }
+
+@media (max-width: 900px) {
+  .tm-side { display: none; }
+  .tm-content { padding: 16px; }
+  .tm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tm-head h1 { font-size: 19px; }
+}

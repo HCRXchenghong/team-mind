@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ant Design Vue · TeamMind 预览</title>
+<link rel="stylesheet" href="../vendor/antd-reset.css">
+<link rel="stylesheet" href="shell.css">
+<style>
+  :root { --tm-accent: #1677ff; --tm-radius: 6px; }
+  .tm-panel .ant-table-thead > tr > th { background: var(--tm-panel-2); color: var(--tm-muted); font-weight: 600; font-size: 12px; }
+  .tm-panel .ant-table { background: transparent; }
+  .tm-panel .ant-table-tbody > tr > td { border-bottom-color: var(--tm-border); }
+  .ant-card { background: var(--tm-panel); }
+  .tm-kpi .ant-card-body { padding: 14px 16px; }
+  .ant-tag { margin-inline-end: 0; }
+</style>
+</head>
+<body>
+<div id="boot-error" class="tm-boot-error" style="display:none"></div>
+<div id="app" v-cloak>
+  <a-config-provider :theme="themeConfig">
+  <div class="tm-app">
+    <aside class="tm-side">
+      <div class="tm-logo"><span class="tm-logo-mark">T</span> TeamMind</div>
+      <nav class="tm-nav">
+        <div class="tm-nav-label">工作台</div>
+        <a class="tm-nav-item"><span class="dot"></span>总览</a>
+        <a class="tm-nav-item active"><span class="dot"></span>任务中心</a>
+        <a class="tm-nav-item"><span class="dot"></span>项目管理</a>
+        <a class="tm-nav-item"><span class="dot"></span>甘特图</a>
+        <div class="tm-nav-label">协作</div>
+        <a class="tm-nav-item"><span class="dot"></span>审批中心</a>
+        <a class="tm-nav-item"><span class="dot"></span>成员</a>
+      </nav>
+      <div class="tm-side-foot">Ant Design Vue<br>4.2.6 · 蚂蚁集团</div>
+    </aside>
+
+    <div class="tm-main">
+      <header class="tm-top">
+        <div class="tm-crumb">工作台 / <b>任务中心</b></div>
+        <div class="tm-top-right">
+          <a-select :options="teamOptions" value="tm" size="small" style="width: 136px"></a-select>
+          <button class="tm-theme-btn" @click="toggleTheme">{{ dark ? '☀ 浅色' : '☾ 深色' }}</button>
+          <span class="tm-avatar">林</span>
+        </div>
+      </header>
+
+      <div class="tm-content">
+        <div class="tm-head">
+          <div>
+            <h1>任务中心</h1>
+            <p>6 个任务 · 2 个阻塞 · 本周 3 个到期</p>
+          </div>
+          <a-button type="primary" @click="createOpen = true">+ 新建任务</a-button>
+        </div>
+
+        <div class="tm-kpis">
+          <a-card v-for="k in kpis" :key="k.label" class="tm-kpi" :bordered="false">
+            <div class="tm-kpi-top"><span>{{ k.label }}</span><span>{{ k.tag }}</span></div>
+            <div class="tm-kpi-value">{{ k.value }}</div>
+            <div class="tm-kpi-foot" v-html="k.foot"></div>
+            <div class="tm-kpi-spark"><i :style="{ width: k.pct + '%' }"></i></div>
+          </a-card>
+        </div>
+
+        <div class="tm-filters">
+          <a-input v-model:value="q" placeholder="搜索任务标题" allow-clear style="width: 210px"></a-input>
+          <a-select v-model:value="status" :options="statusOptions" style="width: 128px"></a-select>
+          <a-select v-model:value="project" :options="projectOptions" style="width: 150px"></a-select>
+          <a-button :type="mine ? 'primary' : 'default'" @click="mine = !mine">我的任务</a-button>
+          <a-button @click="reset">重置</a-button>
+        </div>
+
+        <div class="tm-panel">
+          <div class="tm-table-wrap">
+            <a-table :data-source="filtered" :columns="columns" :pagination="false" row-key="id" size="small" :scroll="{ x: 900 }">
+              </a-table>
+            <div v-if="!filtered.length" class="tm-empty">没有符合条件的任务</div>
+          </div>
+          <div class="tm-table-foot">
+            <span>共 {{ filtered.length }} 条</span>
+            <a-pagination :total="filtered.length" :page-size="10" size="small"></a-pagination>
+          </div>
+        </div>
+        <div class="tm-hint">真实组件渲染：Ant Design Vue 4.2（UMD）。表格、标签、进度条、分页、弹窗均为库内置组件。</div>
+      </div>
+    </div>
+  </div>
+
+  <a-modal v-model:open="createOpen" title="新建任务" @ok="createOpen = false">
+    <a-form :model="draft" layout="vertical">
+      <a-form-item label="任务标题"><a-input v-model:value="draft.title" placeholder="例如：补齐审批流批量处理"></a-input></a-form-item>
+      <a-form-item label="所属项目">
+        <a-select v-model:value="draft.project" :options="[{ value: '工作台 2.0', label: '工作台 2.0' }, { value: '智能助手', label: '智能助手' }]" style="width: 100%"></a-select>
+      </a-form-item>
+    </a-form>
+  </a-modal>
+  </a-config-provider>
+</div>
+
+<script src="../vendor/vue.global.prod.js"></script>
+<script src="../vendor/dayjs.min.js"></script>
+<script src="../vendor/dayjs-plugin-advancedFormat.js"></script>
+<script src="../vendor/dayjs-plugin-customParseFormat.js"></script>
+<script src="../vendor/dayjs-plugin-localeData.js"></script>
+<script src="../vendor/dayjs-plugin-quarterOfYear.js"></script>
+<script src="../vendor/dayjs-plugin-weekOfYear.js"></script>
+<script src="../vendor/dayjs-plugin-weekYear.js"></script>
+<script src="../vendor/dayjs-plugin-weekday.js"></script>
+<script src="../vendor/antd.min.js"></script>
+<script>
+window.addEventListener('error', function (e) {
+  var el = document.getElementById('boot-error');
+  el.style.display = 'block';
+  el.textContent = 'JS ERROR: ' + e.message;
+});
+const { createApp, ref, reactive, computed, watchEffect, h } = Vue;
+
+const rows = [
+  { id: 1, title: '重构任务详情抽屉', project: '工作台 2.0', status: 'doing', priority: 'high', assignee: '林雅', due: '11-06', progress: 65 },
+  { id: 2, title: '甘特图依赖连线', project: '工作台 2.0', status: 'blocked', priority: 'urgent', assignee: '陈默', due: '11-03', progress: 30 },
+  { id: 3, title: '审批流批量处理', project: '流程引擎', status: 'review', priority: 'medium', assignee: '苏禾', due: '11-12', progress: 88 },
+  { id: 4, title: '通知免打扰配置', project: '设置中心', status: 'todo', priority: 'low', assignee: '未分配', due: '11-18', progress: 0 },
+  { id: 5, title: 'AI 会话摘要缓存', project: '智能助手', status: 'done', priority: 'medium', assignee: '周野', due: '10-29', progress: 100 },
+  { id: 6, title: '公开甘特链接轮换', project: '工作台 2.0', status: 'doing', priority: 'high', assignee: '林雅', due: '11-09', progress: 45 },
+];
+
+createApp({
+  setup() {
+    const teamOptions = [{ value: 'tm', label: 'TeamMind 团队' }, { value: 'lab', label: 'AI 实验室' }];
+    const statusOptions = [
+      { value: 'all', label: '全部状态' }, { value: 'todo', label: '待开始' }, { value: 'doing', label: '进行中' },
+      { value: 'blocked', label: '阻塞' }, { value: 'review', label: '待审查' }, { value: 'done', label: '已完成' },
+    ];
+    const projectOptions = [
+      { value: 'all', label: '全部项目' }, { value: '工作台 2.0', label: '工作台 2.0' },
+      { value: '智能助手', label: '智能助手' }, { value: '流程引擎', label: '流程引擎' }, { value: '设置中心', label: '设置中心' },
+    ];
+    const q = ref('');
+    const status = ref('all');
+    const project = ref('all');
+    const mine = ref(false);
+    const dark = ref(false);
+    const createOpen = ref(false);
+    const draft = reactive({ title: '', project: '工作台 2.0' });
+
+    const columns = [
+      {
+        title: '任务', key: 'title', dataIndex: 'title', width: 260,
+        customRender: ({ record }) => h('div', [
+          h('div', { class: 'tm-cell-title' }, record.title),
+          h('div', { class: 'tm-cell-sub' }, record.project + ' · #' + (1200 + record.id)),
+        ]),
+      },
+      {
+        title: '状态', key: 'status', dataIndex: 'status', width: 100,
+        customRender: ({ record }) => h(antd.Tag, { color: statusColor(record.status) }, () => statusLabel(record.status)),
+      },
+      {
+        title: '优先级', key: 'priority', dataIndex: 'priority', width: 92,
+        customRender: ({ record }) => h(antd.Tag, { color: priorityColor(record.priority) }, () => priorityLabel(record.priority)),
+      },
+      {
+        title: '负责人', key: 'assignee', dataIndex: 'assignee', width: 124,
+        customRender: ({ record }) => h('div', { class: 'tm-who' }, [
+          h('i', { class: { none: record.assignee === '未分配' } }, record.assignee.slice(0, 1)),
+          record.assignee,
+        ]),
+      },
+      {
+        title: '进度', key: 'progress', dataIndex: 'progress', width: 160,
+        customRender: ({ record }) => h('div', { class: 'tm-progress' }, [
+          h(antd.Progress, { percent: record.progress, size: 'small', showInfo: false, style: { flex: 1 } }),
+          h('span', { class: 'tm-progress-num' }, record.progress + '%'),
+        ]),
+      },
+      { title: '截止', key: 'due', dataIndex: 'due', width: 84 },
+      {
+        title: '操作', key: 'actions', width: 116,
+        customRender: () => h('div', { class: 'tm-actions' }, [
+          h(antd.Button, { type: 'link', size: 'small' }, () => '详情'),
+          h(antd.Button, { type: 'link', size: 'small' }, () => '编辑'),
+        ]),
+      },
+    ];
+
+    const filtered = computed(() => rows.filter((r) => {
+      if (q.value && !r.title.includes(q.value)) return false;
+      if (status.value !== 'all' && r.status !== status.value) return false;
+      if (project.value !== 'all' && r.project !== project.value) return false;
+      if (mine.value && r.assignee !== '林雅') return false;
+      return true;
+    }));
+
+    const kpis = [
+      { label: '进行中', value: 12, tag: '+3 本周', foot: '较上周 <span class="up">↑ 12%</span>', pct: 62 },
+      { label: '阻塞', value: 2, tag: '需处理', foot: '平均阻塞 <span class="down">1.8 天</span>', pct: 18 },
+      { label: '待审批', value: 5, tag: '提案', foot: '本周已处理 9 条', pct: 40 },
+      { label: '本周完成', value: 18, tag: '目标 24', foot: '完成率 <span class="up">75%</span>', pct: 75 },
+    ];
+
+    const statusMap = { todo: '待开始', doing: '进行中', blocked: '阻塞', review: '待审查', done: '已完成' };
+    const statusColor = (s) => ({ todo: 'default', doing: 'blue', blocked: 'red', review: 'orange', done: 'green' })[s] || 'default';
+    const priorityMap = { low: '低', medium: '中', high: '高', urgent: '紧急' };
+    const priorityColor = (p) => ({ low: 'default', medium: 'blue', high: 'orange', urgent: 'red' })[p] || 'default';
+    const statusLabel = (s) => statusMap[s] || s;
+    const priorityLabel = (p) => priorityMap[p] || p;
+
+    const themeConfig = computed(() => ({
+      algorithm: dark.value ? antd.theme.darkAlgorithm : antd.theme.defaultAlgorithm,
+      token: { colorPrimary: '#1677ff', borderRadius: 6, fontSize: 13 },
+    }));
+
+    function reset() { q.value = ''; status.value = 'all'; project.value = 'all'; mine.value = false; }
+    function toggleTheme() { dark.value = !dark.value; }
+
+    watchEffect(() => { document.body.classList.toggle('dark', dark.value); });
+
+    return {
+      q, status, project, mine, dark, createOpen, draft, columns, filtered, kpis, themeConfig,
+      teamOptions, statusOptions, projectOptions,
+      statusLabel, statusColor, priorityLabel, priorityColor,
+      reset, toggleTheme,
+    };
+  },
+}).use(antd).mount('#app');
+</script>
+</body>
+</html>

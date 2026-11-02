@@ -1,0 +1,1 @@
+ALTER TABLE ai_providers MODIFY COLUMN created_by BINARY(16) NULL;

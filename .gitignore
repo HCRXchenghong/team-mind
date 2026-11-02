@@ -1,0 +1,19 @@
+node_modules/
+.DS_Store
+dist/
+dist-ssr/
+*.local
+.env
+.env.*
+!.env.example
+# Local source snapshots left by the template migration.
+src.previous/
+package-lock.previous
+vite.config.previous.ts
+tsconfig.tsbuildinfo
+__pycache__/
+.pytest_cache/
+coverage/
+# Local demo runtime (generated secrets, logs, PID files).
+.run/
+.archive/
